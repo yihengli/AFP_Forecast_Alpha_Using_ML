@@ -12,7 +12,10 @@ Prices:
 
 https://wrds-web.wharton.upenn.edu/wrds/ds/crsp/stock_a/dsf.cfm?navId=128
 
-Fama-French Factors - Daily Frequency
+Fama-French Factors - Daily Frequency:
 
 https://wrds-web.wharton.upenn.edu/wrds/ds/famafrench/factors_d.cfm?navId=203
 
+Beta Factors:
+
+https://wrds-web.wharton.upenn.edu/wrds/ds/wrdsbeta/index.cfm?navId=428
