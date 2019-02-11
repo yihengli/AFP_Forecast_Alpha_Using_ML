@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 
 
 class YahooProcessor:
@@ -9,7 +10,9 @@ class YahooProcessor:
 
     @staticmethod
     def get_default_folder():
-        return os.path.join(os.path.dirname(__file__), '..', 'yahoos', 'data')
+        return os.path.abspath(
+            os.path.join(os.path.dirname(__file__),
+                         os.pardir, 'yahoos', 'data'))
 
     @staticmethod
     def load_data(ticker, folder=None):
@@ -21,6 +24,12 @@ class YahooProcessor:
 
     @staticmethod
     def get_returns(ticker, folder=None, freq='d', fromdate='2000-01-01',
-                    todate='2018-12-31', data_col='Adj Close'):
+                    todate='2018-12-31', data_col='Adj Close', is_log=False):
         df = YahooProcessor.load_data(ticker, folder)
-        pass
+        df = df.resample(freq).last()
+        df = df[(df.index >= fromdate) & (df.index <= todate)]
+
+        if is_log:
+            return df[data_col].pct_change()
+        else:
+            return np.log(1 + df[data_col].pct_change())
