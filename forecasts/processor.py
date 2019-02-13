@@ -93,7 +93,7 @@ class FamaFrenchBasicProcessor(FeatureProcessor):
         return df.set_index("date")
 
     @staticmethod
-    def get_features(tickers=None, folder=None, freq='d', 
+    def get_features(tickers=None, folder=None, freq='d',
                      fromdate='2000-01-01', todate='2018-12-31',
                      data_cols=None):
         data = FamaFrenchBasicProcessor.load_data(tickers, folder)
@@ -101,6 +101,8 @@ class FamaFrenchBasicProcessor(FeatureProcessor):
         if data_cols is not None:
             data = data[data_cols]
 
-        data = data.resample(freq).last()
+        if freq != 'd':
+            data = data.resample(freq).apply(
+                lambda x: (x + 1).cumprod()[-1]-1)
         data = data[(data.index <= todate) & (data.index >= fromdate)]
         return data
