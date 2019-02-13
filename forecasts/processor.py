@@ -4,18 +4,28 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 
-class Processor(ABC):
+class LabelProcessor(ABC):
 
+    @staticmethod
     @abstractmethod
     def get_returns(tickers, folder, freq, fromdate, todate, data_col):
         pass
 
+    @staticmethod
     @abstractmethod
     def get_all_tickers(folder):
         pass
 
 
-class YahooProcessor(Processor):
+class FeatureProcessor(ABC):
+
+    @staticmethod
+    @abstractmethod
+    def get_features(tickers, folder, fromdate, todate, data_cols):
+        raise NotImplementedError
+
+
+class YahooProcessor(LabelProcessor):
     """
     The set of pre-processors to handle data downloaded from Yahoo APIs
     """
@@ -34,6 +44,7 @@ class YahooProcessor(Processor):
         return pd.read_csv(os.path.join(folder, ticker+'.csv'),
                            index_col='Date', parse_dates=True)
 
+    @staticmethod
     def _get_return(ticker, folder=None, freq='d', fromdate='2000-01-01',
                     todate='2018-12-31', data_col='Adj Close', is_log=False):
         df = YahooProcessor.load_data(ticker, folder)
@@ -63,3 +74,33 @@ class YahooProcessor(Processor):
         tickers = os.listdir(folder)
 
         return [t[:-4] for t in tickers if t.endswith('.csv')]
+
+
+class FamaFrenchBasicProcessor(FeatureProcessor):
+
+    @staticmethod
+    def get_default_folder():
+        return os.path.abspath(
+            os.path.join(os.path.dirname(__file__), os.pardir,
+                         "Fama-French Factors - Daily Frequency.csv"))
+
+    @staticmethod
+    def load_data(ticker=None, folder=None):
+        if folder is None:
+            folder = FamaFrenchBasicProcessor.get_default_folder()
+        df = pd.read_csv(folder)
+        df["date"] = pd.to_datetime(df["date"], format="%Y/%m/%d")
+        return df.set_index("date")
+
+    @staticmethod
+    def get_features(tickers=None, folder=None, freq='d', 
+                     fromdate='2000-01-01', todate='2018-12-31',
+                     data_cols=None):
+        data = FamaFrenchBasicProcessor.load_data(tickers, folder)
+
+        if data_cols is not None:
+            data = data[data_cols]
+
+        data = data.resample(freq).last()
+        data = data[(data.index <= todate) & (data.index >= fromdate)]
+        return data
