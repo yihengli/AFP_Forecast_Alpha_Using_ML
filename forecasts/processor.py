@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+from enum import Enum
 from abc import ABC, abstractmethod
 
 
@@ -58,7 +59,10 @@ class YahooProcessor(LabelProcessor):
 
     @staticmethod
     def get_returns(tickers, folder=None, freq='d', fromdate='2000-01-01',
-                    todate='2018-12-31', data_col='Adj Close', is_log=False):
+                    todate='2018-12-31', data_col=None, is_log=False):
+        if data_col is None:
+            data_col = 'Adj Close'
+
         res = {}
         for ticker in tickers:
             res[ticker] = YahooProcessor._get_return(ticker, folder, freq,
@@ -106,3 +110,11 @@ class FamaFrenchBasicProcessor(FeatureProcessor):
                 lambda x: (x + 1).cumprod()[-1]-1)
         data = data[(data.index <= todate) & (data.index >= fromdate)]
         return data
+
+
+class TaskLabels(Enum):
+    yahoo = YahooProcessor
+
+
+class TaskFeatures(Enum):
+    ff_basic = FamaFrenchBasicProcessor

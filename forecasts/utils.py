@@ -24,6 +24,8 @@ def load_search_cv_config(path_config):
     dict
         The dict of kwargs that can be directly used by SearchCV objects.
     """
+    if path_config is None:
+        return path_config
 
     with open(path_config, 'r') as config:
         settings = yaml.load(config)
@@ -37,14 +39,16 @@ def load_search_cv_config(path_config):
 def in_ipynb():
     """
     Check if the current environment is IPython Notebook
+
     Note, Spyder terminal is also using ZMQShell but cannot render Widget.
+
     Returns
     -------
     bool
         True if the current env is Jupyter notebook
     """
     try:
-        zmq_status = str(type(get_ipython())) == "<class 'ipykernel.zmqshell.ZMQInteractiveShell'>" # noqa E501
+        zmq_status = str(type(get_ipython())) == "<class 'ipykernel.zmqshell.ZMQInteractiveShell'>"  # noqa E501
         spyder_status = any('SPYDER' in name for name in os.environ)
         return zmq_status and not spyder_status
 

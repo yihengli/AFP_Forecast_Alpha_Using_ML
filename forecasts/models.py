@@ -42,6 +42,7 @@ class RollingMethod:
             logger.info("<{}> - {}".format(self.task_name, text))
 
     def run(self, model, x, y):
+
         if len(x) <= self.rolling_bars:
             raise Exception("RollingMethod cannot be initialzed due to size "
                             "is smaller than the rolling periods.")
@@ -62,15 +63,15 @@ class RollingMethod:
             model.train(train_x, train_y, **self.train_args)
 
             predict_x = x[train_end: predict_end]
-            predict_y = y[train_end: predict_end]
 
             self.log("Predicting from bar %d to bar %d..." %
                      (train_end, predict_end - 1))
             predictions.append(
-                model.predict(predict_x, predict_y, **self.predict_args))
+                model.predict(predict_x, **self.predict_args))
 
         return np.concatenate(
-            [np.repeat(np.nan, self.rolling_bars), predictions])
+            [np.repeat(np.nan, self.rolling_bars),
+             np.concatenate(predictions)])
 
 
 class SklearnGeneralModel(ModelBase):
@@ -92,13 +93,32 @@ class SklearnGeneralModel(ModelBase):
     def train(self, x, y):
         self.model.fit(x, y)
 
-    def predict(self, x, y):
-        self.model.predict(x, y)
+    def predict(self, x):
+        return self.model.predict(x)
 
 
 class ModelSelections(Enum):
 
-    Regression = SklearnGeneralModel(model=lm.LinearRegression, searchCV=False)
-    ElasticNet = SklearnGeneralModel(model=lm.ElasticNet, searchCV=True)
-    SKGBM = SklearnGeneralModel(model=ens.GradientBoostingRegressor,
-                                searchCV=True)
+    Regression = {
+        "base": SklearnGeneralModel,
+        "init_args": {
+            "model": lm.LinearRegression,
+            "searchCV": False
+        }
+    }
+
+    ElasticNet = {
+        "base": SklearnGeneralModel,
+        "init_args": {
+            "model": lm.ElasticNet,
+            "searchCV": True
+        }
+    }
+
+    SKGBM = {
+        "base": SklearnGeneralModel,
+        "init_args": {
+            "model": ens.GradientBoostingRegressor,
+            "searchCV": True
+        }
+    }
