@@ -28,8 +28,10 @@ Pygments==2.3.1
 pyparsing==2.3.1
 python-dateutil==2.7.5
 pytz==2018.9
+PyYAML==3.13
 pyzmq==17.1.2
 scikit-learn==0.20.2
+scikit-optimize==0.5.2
 scipy==1.2.0
 six==1.12.0
 tornado==5.1.1
