@@ -1,9 +1,19 @@
 from abc import ABC, abstractmethod
-from utils import get_logger, get_tqdm
+from enum import Enum
+
 import numpy as np
+from sklearn import ensemble as ens
+from sklearn import linear_model as lm
+
+from skopt import BayesSearchCV
+from utils import get_logger, get_tqdm
 
 
 class ModelBase(ABC):
+
+    @abstractmethod
+    def build_model(self, config_args=None):
+        pass
 
     @abstractmethod
     def train(self, x, y):
@@ -61,3 +71,34 @@ class RollingMethod:
 
         return np.concatenate(
             [np.repeat(np.nan, self.rolling_bars), predictions])
+
+
+class SklearnGeneralModel(ModelBase):
+
+    def __init__(self, model, searchCV=False):
+        self.model = model
+        self.searchCV = searchCV
+
+    def build_model(self, config_args=None):
+
+        if config_args is None:
+            config_args = {}
+
+        if not self.searchCV:
+            self.model = self.model(**config_args)
+        else:
+            self.model = BayesSearchCV(estimator=self.model(), **config_args)
+
+    def train(self, x, y):
+        self.model.fit(x, y)
+
+    def predict(self, x, y):
+        self.model.predict(x, y)
+
+
+class ModelSelections(Enum):
+
+    Regression = SklearnGeneralModel(model=lm.LinearRegression, searchCV=False)
+    ElasticNet = SklearnGeneralModel(model=lm.ElasticNet, searchCV=True)
+    SKGBM = SklearnGeneralModel(model=ens.GradientBoostingRegressor,
+                                searchCV=True)
