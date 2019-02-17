@@ -3,13 +3,19 @@ import pandas as pd
 import numpy as np
 from enum import Enum
 from abc import ABC, abstractmethod
+from utils import get_tqdm, get_logger
 
 
-def get_labels(task, tickers, folder, freq, fromdate, todate, data_col=None):
+def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,
+               data_col=None):
     processor = TaskLabels[task].value
+
+    if len(tickers) == 0:
+        tickers = processor.get_all_tickers()
 
     return processor.get_returns(tickers, folder=folder, freq=freq,
                                  fromdate=fromdate, todate=todate,
+                                 forward_bars=forward_bars,
                                  data_col=data_col)
 
 
@@ -26,7 +32,8 @@ class LabelProcessor(ABC):
 
     @staticmethod
     @abstractmethod
-    def get_returns(tickers, folder, freq, fromdate, todate, data_col):
+    def get_returns(tickers, folder, freq, fromdate, todate, forward_bars,
+                    data_col):
         pass
 
     @staticmethod
@@ -64,27 +71,46 @@ class YahooProcessor(LabelProcessor):
 
     @staticmethod
     def _get_return(ticker, folder=None, freq='d', fromdate='2000-01-01',
-                    todate='2018-12-31', data_col='Adj Close', is_log=False):
+                    todate='2018-12-31', forward_bars=None,
+                    data_col='Adj Close', is_log=False):
+
         df = YahooProcessor.load_data(ticker, folder)
         df = df.resample(freq).last()
         df = df[(df.index >= fromdate) & (df.index <= todate)]
 
-        if is_log:
-            return df[data_col].pct_change()
+        if not is_log:
+            returns = df[data_col].pct_change()
         else:
-            return np.log(1 + df[data_col].pct_change())
+            returns = np.log(1 + df[data_col].pct_change())
+
+        if forward_bars is not None and forward_bars > 0:
+            if is_log:
+                returns = returns.rolling(forward_bars)\
+                    .apply(lambda x: x.cumsum()[-1] - 1, raw=False)
+            else:
+                returns = returns.rolling(forward_bars)\
+                    .apply(lambda x: (1 + x).cumprod()[-1] - 1, raw=False)
+
+        return returns
 
     @staticmethod
     def get_returns(tickers, folder=None, freq='d', fromdate='2000-01-01',
-                    todate='2018-12-31', data_col=None, is_log=False):
+                    todate='2018-12-31', forward_bars=None, data_col=None,
+                    is_log=False):
         if data_col is None:
             data_col = 'Adj Close'
 
         res = {}
-        for ticker in tickers:
+        tqdm, ascii = get_tqdm()
+        logger = get_logger()
+
+        logger.info('Loading Yahoo Labels...')
+        for ticker in tqdm(tickers, ascii=ascii):
+            logger.info('Loading %s' % ticker)
             res[ticker] = YahooProcessor._get_return(ticker, folder, freq,
                                                      fromdate, todate,
-                                                     data_col, is_log)
+                                                     forward_bars, data_col,
+                                                     is_log)
         return res
 
     @staticmethod

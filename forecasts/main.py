@@ -37,12 +37,18 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
               type=click.Choice(ModelList), show_default=True)
 @click.option('--label', default='yahoo', help='Name of label processors',
               type=click.Choice(LabelList), show_default=True)
+@click.option('--lags', default=1, show_default=True,
+              help='How many lags to shift the label, this might be helpful '
+                   'when solving a time-series prediction')
 @click.option('--features', default='ff_basic',
               help='Name of features processors',
               type=click.Choice(FeatureList), show_default=True)
 @click.option('--rolling/--no-rolling', default=False,
               help='Make rolling predictions or standard train-test split',
               show_default=True)
+@click.option('--forward-bars', default=0, show_default=True,
+              help='When predicting daily returns, if we are going to predict '
+                   'n days forward returns instead of one day return')
 @click.option('--predict-bars', default=30, show_default=True,
               help='How many bars will be used in predict when rolling is on')
 @click.option('--rolling-bars', default=90, show_default=True,
@@ -57,8 +63,8 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
               help="Check if train period at least hit this bar, only "
                    "effective when rolling is off")
 @click.pass_context
-def forecast(ctx, tickers, label_path, feature_path, freq,
-             model, label, features, rolling, rolling_bars, predict_bars,
+def forecast(ctx, tickers, label_path, feature_path, freq, model, label, lags,
+             features, rolling, rolling_bars, forward_bars, predict_bars,
              train_periods, test_periods, minimum_train_bars):
 
     name = ctx.obj['name']
@@ -66,8 +72,8 @@ def forecast(ctx, tickers, label_path, feature_path, freq,
     debug = ctx.obj['debug']
 
     fct.forecast(name, output, tickers, label_path, feature_path, freq, label,
-                 features, model, train_periods, test_periods, rolling,
-                 rolling_bars, predict_bars, minimum_train_bars,
+                 lags, features, model, train_periods, test_periods, rolling,
+                 rolling_bars, forward_bars, predict_bars, minimum_train_bars,
                  debug, label_transforms=None, features_transforms=None)
 
 

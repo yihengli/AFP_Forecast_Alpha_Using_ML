@@ -6,10 +6,11 @@ import numpy as np
 import os
 
 
-def train_and_predict(name, label, features, model, train_periods,
+def train_and_predict(name, label, lags, features, model, train_periods,
                       test_periods, is_rolling=False, rolling_bars=0,
-                      predict_bars=0, minimum_train_bars=90, is_debug=False,
-                      label_transforms=None, features_transforms=None):
+                      forward_bars=0, predict_bars=0, minimum_train_bars=90,
+                      is_debug=False, label_transforms=None,
+                      features_transforms=None):
 
     if label_transforms is None:
         label_transforms = []
@@ -21,6 +22,9 @@ def train_and_predict(name, label, features, model, train_periods,
         label = trans.apply(label)
     for trans in features_transforms:
         features = trans.apply(features)
+
+    # Shift Labels based on given lags
+    label = label.shift(-lags)
 
     # Force X and Y have the same dates range
     label.dropna(inplace=True)
@@ -78,16 +82,17 @@ def train_and_predict(name, label, features, model, train_periods,
 
 
 def forecast(name, output, tickers, label_path, feature_path, freq, label,
-             features, model, train_periods, test_periods, is_rolling=False,
-             rolling_bars=0, predict_bars=0, minimum_train_bars=90,
-             is_debug=False, label_transforms=None, features_transforms=None):
+             lags, features, model, train_periods, test_periods,
+             is_rolling=False, rolling_bars=0, forward_bars=0, predict_bars=0,
+             minimum_train_bars=90, is_debug=False, label_transforms=None,
+             features_transforms=None):
     logger = get_logger()
     tqdm, ascii = get_tqdm()
 
     logger.info('<%s> Initialized' % name)
 
     labels = get_labels(label, tickers, label_path, freq,
-                        train_periods[0], test_periods[1])
+                        train_periods[0], test_periods[1], forward_bars)
     features = get_features(features, tickers, feature_path,
                             freq, train_periods[0], test_periods[1])
 
@@ -111,8 +116,8 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
 
         try:
             pred = train_and_predict(
-                '', _label, _feature, _model, train_periods,
-                test_periods, is_rolling, rolling_bars,
+                '', _label, lags, _feature, _model, train_periods,
+                test_periods, is_rolling, rolling_bars, forward_bars,
                 predict_bars, minimum_train_bars, is_debug,
                 label_transforms, features_transforms)
             res[k] = pred
