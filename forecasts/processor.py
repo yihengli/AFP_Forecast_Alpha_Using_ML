@@ -5,6 +5,23 @@ from enum import Enum
 from abc import ABC, abstractmethod
 
 
+def get_labels(task, tickers, folder, freq, fromdate, todate, data_col=None):
+    processor = TaskLabels[task].value
+
+    return processor.get_returns(tickers, folder=folder, freq=freq,
+                                 fromdate=fromdate, todate=todate,
+                                 data_col=data_col)
+
+
+def get_features(task, tickers, folder, freq, fromdate, todate,
+                 data_cols=None):
+    processor = TaskFeatures[task].value
+
+    return processor.get_features(tickers, folder=folder, freq=freq,
+                                  fromdate=fromdate, todate=todate,
+                                  data_cols=data_cols)
+
+
 class LabelProcessor(ABC):
 
     @staticmethod

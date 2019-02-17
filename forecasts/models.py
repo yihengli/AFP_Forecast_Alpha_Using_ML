@@ -6,7 +6,17 @@ from sklearn import ensemble as ens
 from sklearn import linear_model as lm
 
 from skopt import BayesSearchCV
-from utils import get_logger, get_tqdm
+from utils import get_logger, get_tqdm, load_search_cv_config
+
+
+def get_model(model_name, config_path):
+    config_args = load_search_cv_config(config_path)
+
+    model = ModelSelections[model_name].value
+    model = model["base"](**model["init_args"])
+    model.build_model(config_args=config_args)
+
+    return model
 
 
 class ModelBase(ABC):
