@@ -20,3 +20,5 @@ Only need to expand the `processor` classes `model` classes. This scafold should
 Next steps is to construct the a set of auto-analyzers on top of the generated predictions.
 
 It would also be interesting to integrate a set of data transformation pipelines, but not as the priority. (As users can always "hardcode" those specific transformations into `model` or `processor` layers for ad-hoc purposes)
+
+> The cleaned 20 days forward rate Yahoo data cache can also be downloaded here: (https://www.dropbox.com/s/zoczdur4m2gxbuk/yahoo_data_cache.pickle?dl=0)[https://www.dropbox.com/s/zoczdur4m2gxbuk/yahoo_data_cache.pickle?dl=0]
