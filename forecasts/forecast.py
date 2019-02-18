@@ -82,7 +82,7 @@ def train_and_predict(name, label, lags, features, model, train_periods,
 
 
 def forecast(name, output, tickers, label_path, feature_path, freq, label,
-             lags, features, model, train_periods, test_periods,
+             label_cache, lags, features, model, train_periods, test_periods,
              is_rolling=False, rolling_bars=0, forward_bars=0, predict_bars=0,
              minimum_train_bars=90, is_debug=False, label_transforms=None,
              features_transforms=None):
@@ -91,8 +91,18 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
 
     logger.info('<%s> Initialized' % name)
 
+    # Decide cache information
+    if label_cache is None:
+        save_cache, load_cache, cache_name = False, False, None
+    elif os.path.isfile(label_cache):
+        save_cache, load_cache, cache_name = False, True, label_cache
+    else:
+        save_cache, load_cache, cache_name = True, False, label_cache
+
     labels = get_labels(label, tickers, label_path, freq,
-                        train_periods[0], test_periods[1], forward_bars)
+                        train_periods[0], test_periods[1], forward_bars,
+                        save_cache=save_cache, load_cache=load_cache,
+                        cache_name=cache_name, is_debug=is_debug)
     features = get_features(features, tickers, feature_path,
                             freq, train_periods[0], test_periods[1])
 
@@ -107,8 +117,11 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
                 (name, len(labels.keys())))
 
     res = {}
+    fails = 0
     for k in tqdm(list(labels.keys()), ascii=ascii):
-        logger.info('<%s> Running On [%s]' % (name, k))
+
+        if is_debug:
+            logger.info('<%s> Running On [%s]' % (name, k))
 
         _label = labels[k]
         _feature = features[k]
@@ -123,9 +136,14 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
             res[k] = pred
         except Exception as e:
             logger.error('<%s> Failed On [%s] Due To "%s"' % (name, k, e))
+            fails += 1
 
-    logger.info('<%s> Forecasting Finished, Writing Results To Output File...'
-                % name)
-    pd.concat(res, 1).to_csv(os.path.join(output, name + '.csv'))
+    logger.info('<%s> Forecasting Finished, Successfully Built Model on %d '
+                'stocks, Failed On %d Stocks.'
+                % (name, len(labels.keys()), fails))
 
-    logger.info('<%s> **** Done ****' % name)
+    output_file = os.path.join(output, name + '.csv')
+    logger.info('Writing Results To Output Files: %s' % output_file)
+    pd.concat(res, 1).to_csv(output_file)
+
+    logger.info('<%s> ******* Done *******' % name)

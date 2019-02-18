@@ -1,13 +1,16 @@
 ## AFP: Forecasting Scaffold
 
 ```
-python3 main.py --name your_task_name forecast \
+python3 main.py --name your_task_name 
+                forecast \
                 --model Regression \
-                -t AAPL -t MSFT -t AMZN \
                 --rolling \
                 --freq d \
                 --train-periods 2001-01-01 2014-12-31 \
                 --test-periods 2015-01-01 2018-12-31 \
+                ----lags 20 \
+                --forward-bars 20 \
+                --label-cache `pwd`/yahoo_data_cache.pickle
 ```
 
 More detailed documentations will be enhanced afterward...

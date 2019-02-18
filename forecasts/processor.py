@@ -4,19 +4,34 @@ import numpy as np
 from enum import Enum
 from abc import ABC, abstractmethod
 from utils import get_tqdm, get_logger
+import pickle
 
 
 def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,
-               data_col=None):
+               data_col=None, save_cache=False, load_cache=False,
+               cache_name=None, is_debug=True):
     processor = TaskLabels[task].value
+    logger = get_logger()
 
     if len(tickers) == 0:
         tickers = processor.get_all_tickers()
 
-    return processor.get_returns(tickers, folder=folder, freq=freq,
-                                 fromdate=fromdate, todate=todate,
-                                 forward_bars=forward_bars,
-                                 data_col=data_col)
+    if load_cache and cache_name is not None:
+        logger.info('Loading Cached Labels From %s...' % cache_name)
+        with open(cache_name, 'rb') as handle:
+            returns = pickle.load(handle)
+
+    else:
+        returns = processor.get_returns(tickers, folder=folder, freq=freq,
+                                        fromdate=fromdate, todate=todate,
+                                        forward_bars=forward_bars,
+                                        data_col=data_col, is_debug=is_debug)
+        if save_cache and cache_name is not None:
+            logger.info('Cache Processed Labels At %s...' % cache_name)
+            with open(cache_name, 'wb') as handle:
+                pickle.dump(returns, handle)
+
+    return returns
 
 
 def get_features(task, tickers, folder, freq, fromdate, todate,
@@ -33,7 +48,7 @@ class LabelProcessor(ABC):
     @staticmethod
     @abstractmethod
     def get_returns(tickers, folder, freq, fromdate, todate, forward_bars,
-                    data_col):
+                    data_col, is_debug):
         pass
 
     @staticmethod
@@ -96,7 +111,7 @@ class YahooProcessor(LabelProcessor):
     @staticmethod
     def get_returns(tickers, folder=None, freq='d', fromdate='2000-01-01',
                     todate='2018-12-31', forward_bars=None, data_col=None,
-                    is_log=False):
+                    is_log=False, is_debug=False):
         if data_col is None:
             data_col = 'Adj Close'
 
@@ -106,7 +121,8 @@ class YahooProcessor(LabelProcessor):
 
         logger.info('Loading Yahoo Labels...')
         for ticker in tqdm(tickers, ascii=ascii):
-            logger.info('Loading %s' % ticker)
+            if is_debug:
+                logger.info('Loading %s' % ticker)
             res[ticker] = YahooProcessor._get_return(ticker, folder, freq,
                                                      fromdate, todate,
                                                      forward_bars, data_col,

@@ -64,7 +64,8 @@ class RollingMethod:
         predictions = []
         tqdm, ascii = get_tqdm()
         for train_end, predict_end in tqdm(zip(arr[:-1], arr[1:]),
-                                           ascii=ascii, total=len(arr)-1):
+                                           ascii=ascii, total=len(arr)-1,
+                                           disable=(not self.is_debug)):
             train_x = x[train_end - self.rolling_bars: train_end]
             train_y = y[train_end - self.rolling_bars: train_end]
 

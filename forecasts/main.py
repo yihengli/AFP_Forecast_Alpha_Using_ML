@@ -37,6 +37,11 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
               type=click.Choice(ModelList), show_default=True)
 @click.option('--label', default='yahoo', help='Name of label processors',
               type=click.Choice(LabelList), show_default=True)
+@click.option('--label-cache', default=None, show_default=True,
+              help='The location of cached file, if provied, labels will be '
+                   'directly loaded from the cached files instead of '
+                   'processing from scratch. If no cached file can be found, '
+                   'the processed labels will cached at the given location')
 @click.option('--lags', default=1, show_default=True,
               help='How many lags to shift the label, this might be helpful '
                    'when solving a time-series prediction')
@@ -63,18 +68,19 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
               help="Check if train period at least hit this bar, only "
                    "effective when rolling is off")
 @click.pass_context
-def forecast(ctx, tickers, label_path, feature_path, freq, model, label, lags,
-             features, rolling, rolling_bars, forward_bars, predict_bars,
-             train_periods, test_periods, minimum_train_bars):
+def forecast(ctx, tickers, label_path, feature_path, freq, model, label,
+             label_cache, lags, features, rolling, rolling_bars, forward_bars,
+             predict_bars, train_periods, test_periods, minimum_train_bars):
 
     name = ctx.obj['name']
     output = ctx.obj['output']
     debug = ctx.obj['debug']
 
     fct.forecast(name, output, tickers, label_path, feature_path, freq, label,
-                 lags, features, model, train_periods, test_periods, rolling,
-                 rolling_bars, forward_bars, predict_bars, minimum_train_bars,
-                 debug, label_transforms=None, features_transforms=None)
+                 label_cache, lags, features, model, train_periods,
+                 test_periods, rolling, rolling_bars, forward_bars,
+                 predict_bars, minimum_train_bars, debug,
+                 label_transforms=None, features_transforms=None)
 
 
 if __name__ == '__main__':
