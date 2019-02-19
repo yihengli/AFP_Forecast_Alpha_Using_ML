@@ -1,3 +1,5 @@
+*.pickle
+
 
 # Created by https://www.gitignore.io/api/macos,python,windows,pycharm,visualstudio
 # Edit at https://www.gitignore.io/?templates=macos,python,windows,pycharm,visualstudio

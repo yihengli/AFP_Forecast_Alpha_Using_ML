@@ -1,14 +1,15 @@
 ## AFP: Forecasting Scaffold
 
 ```
-python3 main.py --name your_task_name 
+python3 main.py --name your_task_name \
+                --output $(dirname `pwd`)/forecasts_outputs \
                 forecast \
                 --model Regression \
                 --rolling \
                 --freq d \
                 --train-periods 2001-01-01 2014-12-31 \
                 --test-periods 2015-01-01 2018-12-31 \
-                ----lags 20 \
+                --lags 20 \
                 --forward-bars 20 \
                 --label-cache `pwd`/yahoo_data_cache.pickle
 ```
@@ -21,4 +22,4 @@ Next steps is to construct the a set of auto-analyzers on top of the generated p
 
 It would also be interesting to integrate a set of data transformation pipelines, but not as the priority. (As users can always "hardcode" those specific transformations into `model` or `processor` layers for ad-hoc purposes)
 
-> The cleaned 20 days forward rate Yahoo data cache can also be downloaded here: (https://www.dropbox.com/s/zoczdur4m2gxbuk/yahoo_data_cache.pickle?dl=0)[https://www.dropbox.com/s/zoczdur4m2gxbuk/yahoo_data_cache.pickle?dl=0]
+> The cleaned 20 days forward rate Yahoo data cache can also be downloaded here: https://www.dropbox.com/s/zoczdur4m2gxbuk/yahoo_data_cache.pickle?dl=0
