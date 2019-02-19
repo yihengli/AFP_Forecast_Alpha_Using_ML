@@ -2,8 +2,10 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 import numpy as np
+import statsmodels.api as sm
 from sklearn import ensemble as ens
 from sklearn import linear_model as lm
+import pandas as pd
 
 from skopt import BayesSearchCV
 from utils import get_logger, get_tqdm, load_search_cv_config
@@ -30,7 +32,11 @@ class ModelBase(ABC):
         pass
 
     @abstractmethod
-    def predict(self, x, y):
+    def predict(self, x):
+        pass
+
+    @abstractmethod
+    def feature_based_metrics(self, columns=None, index=None):
         pass
 
 
@@ -62,10 +68,9 @@ class RollingMethod:
         arr = np.concatenate([arr, [len(x)]])
 
         predictions = []
+        other_metrics = []
         tqdm, ascii = get_tqdm()
-        for train_end, predict_end in tqdm(zip(arr[:-1], arr[1:]),
-                                           ascii=ascii, total=len(arr)-1,
-                                           disable=(not self.is_debug)):
+        for train_end, predict_end in zip(arr[:-1], arr[1:]):
             train_x = x[train_end - self.rolling_bars: train_end]
             train_y = y[train_end - self.rolling_bars: train_end]
 
@@ -79,10 +84,16 @@ class RollingMethod:
                      (train_end, predict_end - 1))
             predictions.append(
                 model.predict(predict_x, **self.predict_args))
+            other_metric = model.feature_based_metrics(
+                columns=list(range(x.shape[1])), index=[train_end])
+            if other_metric is not None:
+                other_metrics.append(other_metric)
 
-        return np.concatenate(
+        predictions = np.concatenate(
             [np.repeat(np.nan, self.rolling_bars),
              np.concatenate(predictions)])
+        metrics = pd.concat(other_metrics) if len(other_metrics) > 0 else None
+        return predictions, metrics
 
 
 class SklearnGeneralModel(ModelBase):
@@ -107,15 +118,45 @@ class SklearnGeneralModel(ModelBase):
     def predict(self, x):
         return self.model.predict(x)
 
+    def feature_based_metrics(self, columns=None, index=None):
+        pass
+
+
+class StatsRegressionModel(ModelBase):
+
+    def __init__(self):
+        pass
+
+    def build_model(self, config_args=None):
+        if config_args is None:
+            config_args = {}
+
+        if 'fit_intercept' in config_args.keys():
+            self.intercept = config_args['fit_intercept']
+        else:
+            self.intercept = False
+
+    def train(self, x, y):
+        x = sm.add_constant(x, has_constant='add') if self.intercept else x
+        self.model = sm.OLS(y, x)
+        self.result = self.model.fit()
+
+    def predict(self, x):
+        return np.array(self.result.predict(x))
+
+    def feature_based_metrics(self, columns=None, index=None):
+        """
+        Will also generate the t-stats for each feature
+        """
+        return pd.DataFrame(
+            self.result.tvalues, index=columns, columns=index).T
+
 
 class ModelSelections(Enum):
 
     Regression = {
-        "base": SklearnGeneralModel,
-        "init_args": {
-            "model": lm.LinearRegression,
-            "searchCV": False
-        }
+        'base': StatsRegressionModel,
+        'init_args': {}
     }
 
     ElasticNet = {

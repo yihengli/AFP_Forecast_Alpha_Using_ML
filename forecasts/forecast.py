@@ -50,10 +50,9 @@ def train_and_predict(name, label, lags, features, model, train_periods,
         preds_is = model.predict(train_x.values)
         preds_oos = model.predict(test_x.values)
 
-        # import ipdb; ipdb.set_trace()
-
         res = pd.Series(np.concatenate((preds_is, preds_oos)),
                         index=train_y.index.union(test_y.index))
+        other_metrics = model.feature_based_metrics(features.columns, [name])
 
     # For rolling case, train-test split won't be executed
     else:
@@ -64,14 +63,20 @@ def train_and_predict(name, label, lags, features, model, train_periods,
                                 predict_bars=predict_bars,
                                 task_name=name, is_debug=is_debug)
 
-        preds = rolling.run(model, features.values, label.values)
+        preds, other_metrics = rolling.run(model, features.values,
+                                           label.values)
+
+        if other_metrics is not None:
+            other_metrics.index = name + ' ' + \
+                other_metrics.index.astype('str')
+
         res = pd.Series(preds, index=label.index)
 
     # Reverse engineer the predictions in case it has been transformed before
     for trans in label_transforms[::-1]:
         res = trans.reverse(res)
 
-    return res
+    return res, other_metrics
 
 
 def forecast(name, output, tickers, label_path, feature_path, freq, label,
@@ -110,6 +115,7 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
                 (name, len(labels.keys())))
 
     res = {}
+    metrics = pd.DataFrame()
     fails = 0
     for k in tqdm(list(labels.keys()), ascii=ascii):
 
@@ -121,12 +127,15 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
         _model = get_model('Regression', config_path=None)
 
         try:
-            pred = train_and_predict(
-                '', _label, lags, _feature, _model, train_periods,
+            print("Currently " + k)
+            pred, other_metrics = train_and_predict(
+                k, _label, lags, _feature, _model, train_periods,
                 test_periods, is_rolling, rolling_bars, forward_bars,
                 predict_bars, minimum_train_bars, is_debug,
                 label_transforms, features_transforms)
             res[k] = pred
+            if other_metrics is not None:
+                metrics = metrics.append(other_metrics)
         except Exception as e:
             logger.error('<%s> Failed On [%s] Due To "%s"' % (name, k, e))
             fails += 1
@@ -138,5 +147,12 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
     output_file = os.path.join(output, name + '.csv')
     logger.info('Writing Results To Output Files: %s' % output_file)
     pd.concat(res, 1).to_csv(output_file, index_label='Date')
+
+    if len(metrics) > 0:
+        output_metrics = os.path.join(output, name + '_metrics' + '.csv')
+        logger.info('Writing Feature Based Metrics To Output Files %s' %
+                    output_metrics)
+        metrics.columns = next(iter(features.values())).columns
+        metrics.to_csv(output_metrics, index_label='Date')
 
     logger.info('<%s> ******* Done *******' % name)
