@@ -90,7 +90,8 @@ class YahooProcessor(LabelProcessor):
                     data_col='Adj Close', is_log=False):
 
         df = YahooProcessor.load_data(ticker, folder)
-        df = df.resample(freq).last()
+        if freq != 'd':
+            df = df.resample(freq).last()
         df = df[(df.index >= fromdate) & (df.index <= todate)]
 
         if not is_log:
@@ -98,13 +99,16 @@ class YahooProcessor(LabelProcessor):
         else:
             returns = np.log(1 + df[data_col].pct_change())
 
+        # Note: Forward Rate is calcualted as t+1 to t+n
         if forward_bars is not None and forward_bars > 0:
             if is_log:
                 returns = returns.rolling(forward_bars)\
-                    .apply(lambda x: x.cumsum()[-1] - 1, raw=False)
+                    .apply(lambda x: x[1:].cumsum()[-1] - 1, raw=False)\
+                    .shift(-forward_bars+1)
             else:
                 returns = returns.rolling(forward_bars)\
-                    .apply(lambda x: (1 + x).cumprod()[-1] - 1, raw=False)
+                    .apply(lambda x: (1 + x[1:]).cumprod()[-1] - 1, raw=False)\
+                    .shift(-forward_bars+1)
 
         return returns
 

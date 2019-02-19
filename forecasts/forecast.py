@@ -1,6 +1,6 @@
 from processor import get_labels, get_features
 from models import RollingMethod, get_model
-from utils import get_logger, get_tqdm
+from utils import get_logger, get_tqdm, _get_between
 import pandas as pd
 import numpy as np
 import os
@@ -23,26 +23,21 @@ def train_and_predict(name, label, lags, features, model, train_periods,
     for trans in features_transforms:
         features = trans.apply(features)
 
-    # Shift Labels based on given lags
-    label = label.shift(-lags)
+    # Shift Features based on given lags
+    features = features.shift(lags)
 
     # Force X and Y have the same dates range
     label.dropna(inplace=True)
     features.dropna(inplace=True)
-
     idx = label.index.intersection(features.index)
     label, features = label.loc[idx], features.loc[idx]
 
     if not is_rolling:
         # Train Test Split
-        train_y = label[(label.index >= train_periods[0]) &
-                        (label.index <= train_periods[1])]
-        test_y = label[(label.index >= test_periods[0]) &
-                       (label.index <= test_periods[1])]
-        train_x = features[(features.index >= train_periods[0]) &
-                           (features.index <= train_periods[1])]
-        test_x = features[(features.index >= test_periods[0]) &
-                          (features.index <= test_periods[1])]
+        train_y = _get_between(label, *train_periods)
+        test_y = _get_between(label, *test_periods)
+        train_x = _get_between(features, *train_periods)
+        test_x = _get_between(features, *test_periods)
 
         # Give up the task where train or test size is not enough
         if train_x.shape[0] < minimum_train_bars:
@@ -62,10 +57,8 @@ def train_and_predict(name, label, lags, features, model, train_periods,
 
     # For rolling case, train-test split won't be executed
     else:
-        label = label[(label.index >= train_periods[0]) &
-                      (label.index <= test_periods[1])]
-        features = features[(features.index >= train_periods[0]) &
-                            (features.index <= test_periods[1])]
+        label = _get_between(label, train_periods[0], test_periods[1])
+        features = _get_between(features, train_periods[0], test_periods[1])
 
         rolling = RollingMethod(rolling_bars=rolling_bars,
                                 predict_bars=predict_bars,
@@ -144,6 +137,6 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
 
     output_file = os.path.join(output, name + '.csv')
     logger.info('Writing Results To Output Files: %s' % output_file)
-    pd.concat(res, 1).to_csv(output_file)
+    pd.concat(res, 1).to_csv(output_file, index_label='Date')
 
     logger.info('<%s> ******* Done *******' % name)
