@@ -26,7 +26,7 @@ def load_predictions(file_path, is_debug=True):
     return df
 
 
-class AnalzyerSingle:
+class AnalyzerSingle:
 
     @staticmethod
     def get_regression_metrics(y_true, y_pred, remove_na=True, name=0):
@@ -107,16 +107,16 @@ class Analyzer:
                 continue
 
             # Calculate Regression metrics
-            metric_res['IS'].append(AnalzyerSingle.get_regression_metrics(
+            metric_res['IS'].append(AnalyzerSingle.get_regression_metrics(
                 train_true, train_pred, name=ticker))
-            metric_res['OOS'].append(AnalzyerSingle.get_regression_metrics(
+            metric_res['OOS'].append(AnalyzerSingle.get_regression_metrics(
                 test_true, test_pred, name=ticker))
 
             # Calculate Rolling Cumulative Errors
             if show_rolling:
-                rolling_res['IS'].append(AnalzyerSingle.get_rolling_metric(
+                rolling_res['IS'].append(AnalyzerSingle.get_rolling_metric(
                     train_true, train_pred, rolling_metric, name=ticker))
-                rolling_res['OOS'].append(AnalzyerSingle.get_rolling_metric(
+                rolling_res['OOS'].append(AnalyzerSingle.get_rolling_metric(
                     test_true, test_pred, rolling_metric, name=ticker))
 
         logger.info('Task Finished: %d Attempted and %d Failed.' %
