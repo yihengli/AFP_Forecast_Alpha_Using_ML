@@ -4,12 +4,13 @@ import numpy as np
 from enum import Enum
 from abc import ABC, abstractmethod
 from utils import get_tqdm, get_logger
+from pathos.helpers import cpu_count, ProcessPool as Pool
 import pickle
 
 
 def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,
                data_col=None, save_cache=False, load_cache=False,
-               cache_name=None, is_debug=True):
+               cache_name=None, is_debug=True, is_multiprocess=False):
     processor = TaskLabels[task].value
     logger = get_logger()
 
@@ -25,7 +26,8 @@ def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,
         returns = processor.get_returns(tickers, folder=folder, freq=freq,
                                         fromdate=fromdate, todate=todate,
                                         forward_bars=forward_bars,
-                                        data_col=data_col, is_debug=is_debug)
+                                        data_col=data_col, is_debug=is_debug,
+                                        is_multiprocess=is_multiprocess)
         if save_cache and cache_name is not None:
             logger.info('Cache Processed Labels At %s...' % cache_name)
             with open(cache_name, 'wb') as handle:
@@ -48,7 +50,7 @@ class LabelProcessor(ABC):
     @staticmethod
     @abstractmethod
     def get_returns(tickers, folder, freq, fromdate, todate, forward_bars,
-                    data_col, is_debug):
+                    data_col, is_debug, is_multiprocess):
         pass
 
     @staticmethod
@@ -115,7 +117,7 @@ class YahooProcessor(LabelProcessor):
     @staticmethod
     def get_returns(tickers, folder=None, freq='d', fromdate='2000-01-01',
                     todate='2018-12-31', forward_bars=None, data_col=None,
-                    is_log=False, is_debug=False):
+                    is_log=False, is_debug=False, is_multiprocess=False):
         if data_col is None:
             data_col = 'Adj Close'
 
@@ -124,13 +126,31 @@ class YahooProcessor(LabelProcessor):
         logger = get_logger()
 
         logger.info('Loading Yahoo Labels...')
-        for ticker in tqdm(tickers, ascii=ascii):
+
+        def _get_return(ticker, res=res, folder=folder, freq=freq,
+                        fromdate=fromdate, todate=todate, is_debug=is_debug,
+                        forward_bars=forward_bars, data_col=data_col,
+                        is_log=is_log):
             if is_debug:
+                logger = get_logger()
                 logger.info('Loading %s' % ticker)
             res[ticker] = YahooProcessor._get_return(ticker, folder, freq,
                                                      fromdate, todate,
                                                      forward_bars, data_col,
                                                      is_log)
+            return ticker, res[ticker]
+
+        if is_multiprocess:
+            logger.info('Initalized Multiprocess To Get Returns...')
+            with Pool(cpu_count()) as p:
+                res_pool = list(tqdm(p.imap(_get_return, tickers),
+                                total=len(tickers), ascii=ascii))
+            res = {item[0]: item[1] for item in res_pool}
+
+        else:
+            list(tqdm(map(_get_return, tickers), total=len(tickers),
+                 ascii=ascii))
+
         return res
 
     @staticmethod

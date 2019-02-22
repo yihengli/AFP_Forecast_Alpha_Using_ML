@@ -67,10 +67,13 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
 @click.option('--minimum-train-bars', show_default=True, default=90,
               help="Check if train period at least hit this bar, only "
                    "effective when rolling is off")
+@click.option('--multiprocess/--no-multiprocess', default=False,
+              show_default=True, help='Multiprocess when possible')
 @click.pass_context
 def forecast(ctx, tickers, label_path, feature_path, freq, model, label,
              label_cache, lags, features, rolling, rolling_bars, forward_bars,
-             predict_bars, train_periods, test_periods, minimum_train_bars):
+             predict_bars, train_periods, test_periods, minimum_train_bars,
+             multiprocess):
 
     name = ctx.obj['name']
     output = ctx.obj['output']
@@ -80,7 +83,8 @@ def forecast(ctx, tickers, label_path, feature_path, freq, model, label,
                  label_cache, lags, features, model, train_periods,
                  test_periods, rolling, rolling_bars, forward_bars,
                  predict_bars, minimum_train_bars, debug,
-                 label_transforms=None, features_transforms=None)
+                 label_transforms=None, features_transforms=None,
+                 is_multiprocess=multiprocess)
 
 
 if __name__ == '__main__':

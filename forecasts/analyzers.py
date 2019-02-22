@@ -134,7 +134,7 @@ class Analyzer:
             append_df_to_excel(output_file, metric_res['OOS'],
                                sheet_name='Metrics OOS')
             if show_rolling:
-                append_df_to_excel(rolling_res['IS'],
+                append_df_to_excel(output_file, rolling_res['IS'],
                                    sheet_name='Rolling %s IS'
                                    % rolling_metric)
                 append_df_to_excel(output_file, rolling_res['OOS'],

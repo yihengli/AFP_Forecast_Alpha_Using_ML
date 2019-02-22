@@ -83,7 +83,7 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
              label_cache, lags, features, model, train_periods, test_periods,
              is_rolling=False, rolling_bars=0, forward_bars=0, predict_bars=0,
              minimum_train_bars=90, is_debug=False, label_transforms=None,
-             features_transforms=None):
+             features_transforms=None, is_multiprocess=False):
     logger = get_logger()
     tqdm, ascii = get_tqdm()
 
@@ -100,7 +100,8 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
     labels = get_labels(label, tickers, label_path, freq,
                         train_periods[0], test_periods[1], forward_bars,
                         save_cache=save_cache, load_cache=load_cache,
-                        cache_name=cache_name, is_debug=is_debug)
+                        cache_name=cache_name, is_debug=is_debug,
+                        is_multiprocess=is_multiprocess)
     features = get_features(features, tickers, feature_path,
                             freq, train_periods[0], test_periods[1])
 
@@ -117,6 +118,7 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
     res = {}
     metrics = pd.DataFrame()
     fails = 0
+
     for k in tqdm(list(labels.keys()), ascii=ascii):
 
         if is_debug:
@@ -127,7 +129,6 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
         _model = get_model('Regression', config_path=None)
 
         try:
-            print("Currently " + k)
             pred, other_metrics = train_and_predict(
                 k, _label, lags, _feature, _model, train_periods,
                 test_periods, is_rolling, rolling_bars, forward_bars,
