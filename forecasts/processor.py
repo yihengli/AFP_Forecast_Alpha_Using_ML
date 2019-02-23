@@ -96,21 +96,17 @@ class YahooProcessor(LabelProcessor):
             df = df.resample(freq).last()
         df = df[(df.index >= fromdate) & (df.index <= todate)]
 
-        if not is_log:
+        if forward_bars is None:
+            forward_bars = 0
+
+        if forward_bars == 0:
             returns = df[data_col].pct_change()
         else:
-            returns = np.log(1 + df[data_col].pct_change())
+            returns = (df[data_col].shift(-forward_bars) /
+                       df[data_col].shift(-1) - 1).shift(1)
 
-        # Note: Forward Rate is calcualted as t+1 to t+n
-        if forward_bars is not None and forward_bars > 0:
-            if is_log:
-                returns = returns.rolling(forward_bars)\
-                    .apply(lambda x: x[1:].cumsum()[-1] - 1, raw=False)\
-                    .shift(-forward_bars+1)
-            else:
-                returns = returns.rolling(forward_bars)\
-                    .apply(lambda x: (1 + x[1:]).cumprod()[-1] - 1, raw=False)\
-                    .shift(-forward_bars+1)
+        if is_log:
+            return np.log(1 + returns)
 
         return returns
 
