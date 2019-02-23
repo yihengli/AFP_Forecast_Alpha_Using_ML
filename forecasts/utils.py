@@ -1,11 +1,11 @@
 import logging
 import os
 
-import numpy as np
 import yaml
 from tqdm import tqdm, tqdm_notebook
 
 import colorlog
+from skopt.space import Integer, Categorical, Real
 
 
 def load_search_cv_config(path_config):
@@ -30,9 +30,19 @@ def load_search_cv_config(path_config):
     with open(path_config, 'r') as config:
         settings = yaml.load(config)
         for k, v in settings['search_spaces'].items():
-            if isinstance(v, dict) and 'np' in v.keys():
-                settings['search_spaces'][k] = getattr(
-                    np, list(v['np'].keys())[-1])(**list(v['np'].values())[-1])
+            if isinstance(v, dict) and 'Real' in v.keys():
+                if 'log-uniform' in v:
+                    settings['search_spaces'][k] = Real(v['Real'][0],
+                                                        v['Real'][1],
+                                                        'log-uniform')
+                else:
+                    settings['search_spaces'][k] = Real(v['Real'][0],
+                                                        v['Real'][1])
+            elif isinstance(v, dict) and 'Integer' in v.keys():
+                settings['search_spaces'][k] = Integer(v['Integer'][0],
+                                                       v['Integer'][1])
+            elif isinstance(v, dict) and 'Categorical' in v.keys():
+                settings['search_spaces'][k] = Categorical(v['Categorical'])
         return settings
 
 

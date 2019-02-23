@@ -48,6 +48,9 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
 @click.option('--features', default='ff_basic',
               help='Name of features processors',
               type=click.Choice(FeatureList), show_default=True)
+@click.option('--config-path', default=None, show_default=True,
+              help='Path to a default config file that details hyper params '
+                   'settings for machine learning models.')
 @click.option('--rolling/--no-rolling', default=False,
               help='Make rolling predictions or standard train-test split',
               show_default=True)
@@ -71,9 +74,9 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
               show_default=True, help='Multiprocess when possible')
 @click.pass_context
 def forecast(ctx, tickers, label_path, feature_path, freq, model, label,
-             label_cache, lags, features, rolling, rolling_bars, forward_bars,
-             predict_bars, train_periods, test_periods, minimum_train_bars,
-             multiprocess):
+             label_cache, lags, features, config_path, rolling, rolling_bars,
+             forward_bars, predict_bars, train_periods, test_periods,
+             minimum_train_bars, multiprocess):
 
     name = ctx.obj['name']
     output = ctx.obj['output']
@@ -81,9 +84,8 @@ def forecast(ctx, tickers, label_path, feature_path, freq, model, label,
 
     fct.forecast(name, output, tickers, label_path, feature_path, freq, label,
                  label_cache, lags, features, model, train_periods,
-                 test_periods, rolling, rolling_bars, forward_bars,
-                 predict_bars, minimum_train_bars, debug,
-                 label_transforms=None, features_transforms=None,
+                 test_periods, config_path, rolling, rolling_bars,
+                 forward_bars, predict_bars, minimum_train_bars, debug,
                  is_multiprocess=multiprocess)
 
 

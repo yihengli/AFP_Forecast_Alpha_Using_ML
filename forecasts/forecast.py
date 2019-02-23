@@ -9,26 +9,18 @@ import os
 def train_and_predict(name, label, lags, features, model, train_periods,
                       test_periods, is_rolling=False, rolling_bars=0,
                       forward_bars=0, predict_bars=0, minimum_train_bars=90,
-                      is_debug=False, label_transforms=None,
-                      features_transforms=None):
-
-    if label_transforms is None:
-        label_transforms = []
-    if features_transforms is None:
-        features_transforms = []
-
-    # Transform the data if necessary
-    for trans in label_transforms:
-        label = trans.apply(label)
-    for trans in features_transforms:
-        features = trans.apply(features)
+                      is_debug=False):
 
     # Shift Features based on given lags
     features = features.shift(lags)
 
     # Force X and Y have the same dates range
+    label = label.replace([np.inf, -np.inf], np.nan)
     label.dropna(inplace=True)
+
+    features = features.replace([np.inf, -np.inf], np.nan)
     features.dropna(inplace=True)
+
     idx = label.index.intersection(features.index)
     label, features = label.loc[idx], features.loc[idx]
 
@@ -47,11 +39,13 @@ def train_and_predict(name, label, lags, features, model, train_periods,
 
         # For non-rolling case, directly train model on entire training set
         model.train(train_x.values, train_y.values)
+
         preds_is = model.predict(train_x.values)
         preds_oos = model.predict(test_x.values)
 
         res = pd.Series(np.concatenate((preds_is, preds_oos)),
                         index=train_y.index.union(test_y.index))
+
         other_metrics = model.feature_based_metrics(features.columns, [name])
 
     # For rolling case, train-test split won't be executed
@@ -72,18 +66,14 @@ def train_and_predict(name, label, lags, features, model, train_periods,
 
         res = pd.Series(preds, index=label.index)
 
-    # Reverse engineer the predictions in case it has been transformed before
-    for trans in label_transforms[::-1]:
-        res = trans.reverse(res)
-
     return res, other_metrics
 
 
 def forecast(name, output, tickers, label_path, feature_path, freq, label,
              label_cache, lags, features, model, train_periods, test_periods,
-             is_rolling=False, rolling_bars=0, forward_bars=0, predict_bars=0,
-             minimum_train_bars=90, is_debug=False, label_transforms=None,
-             features_transforms=None, is_multiprocess=False):
+             config_path, is_rolling=False, rolling_bars=0, forward_bars=0,
+             predict_bars=0, minimum_train_bars=90, is_debug=False,
+             is_multiprocess=False):
     logger = get_logger()
     tqdm, ascii = get_tqdm()
 
@@ -126,14 +116,13 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
 
         _label = labels[k]
         _feature = features[k]
-        _model = get_model('Regression', config_path=None)
+        _model = get_model(model, config_path=config_path)
 
         try:
             pred, other_metrics = train_and_predict(
                 k, _label, lags, _feature, _model, train_periods,
                 test_periods, is_rolling, rolling_bars, forward_bars,
-                predict_bars, minimum_train_bars, is_debug,
-                label_transforms, features_transforms)
+                predict_bars, minimum_train_bars, is_debug)
             res[k] = pred
             if other_metrics is not None:
                 metrics = metrics.append(other_metrics)
@@ -143,7 +132,7 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
 
     logger.info('<%s> Forecasting Finished, Successfully Built Model on %d '
                 'stocks, Failed On %d Stocks.'
-                % (name, len(labels.keys()), fails))
+                % (name, len(labels.keys()) - fails, fails))
 
     output_file = os.path.join(output, name + '.csv')
     logger.info('Writing Results To Output Files: %s' % output_file)
@@ -157,3 +146,8 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
         metrics.to_csv(output_metrics, index_label='Date')
 
     logger.info('<%s> ******* Done *******' % name)
+
+    return {
+        "predictions": res,
+        "metrics": metrics
+    }
