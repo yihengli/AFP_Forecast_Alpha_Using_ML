@@ -19,3 +19,10 @@ https://wrds-web.wharton.upenn.edu/wrds/ds/famafrench/factors_d.cfm?navId=203
 Beta Factors:
 
 https://wrds-web.wharton.upenn.edu/wrds/ds/wrdsbeta/index.cfm?navId=428
+
+
+## Forecast
+
+* **Scaffold**: Please check the `forecasts` folders for details. The interface is `main.py`
+* **Analysis**: Please check the `forecasts/analysis` folder for details. Each analysis is a python notebook
+* **Data**: Intermediate Data is stored at https://drive.google.com/open?id=1LE-HJXRAsuAgMgqL7iXY6S9rNIcSyqDQ
