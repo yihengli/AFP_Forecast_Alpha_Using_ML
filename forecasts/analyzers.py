@@ -63,8 +63,8 @@ class Analyzer:
         if is_debug:
             logger.info(text)
 
-    def analyze(self, pred_path, train_periods, test_periods, is_debug,
-                show_rolling=True, show_details=True, output_file=None,
+    def analyze(self, pred_path, train_periods, test_periods, is_debug=False,
+                show_rolling=True, output_file=None,
                 rolling_metric='cum_abs_error', **label_args):
         logger = get_logger()
         tqdm, ascii = get_tqdm()
