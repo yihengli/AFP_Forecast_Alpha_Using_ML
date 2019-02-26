@@ -5,6 +5,7 @@ import yaml
 from tqdm import tqdm, tqdm_notebook
 
 import colorlog
+import colorama
 from skopt.space import Integer, Categorical, Real
 
 
@@ -118,6 +119,10 @@ def get_logger(name='afp'):
     """
 
     logger = colorlog.getLogger(name)
+
+    # Disable colorama if in jupyter notebook env
+    if in_ipynb():
+        colorama.deinit()
 
     if logger.hasHandlers():
         logger.handlers.clear()
