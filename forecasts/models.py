@@ -5,17 +5,19 @@ import numpy as np
 import statsmodels.api as sm
 from sklearn import ensemble as ens
 from sklearn import linear_model as lm
+from sklearn.preprocessing import Normalizer
 import pandas as pd
+import warnings
 
 from skopt import BayesSearchCV
 from utils import get_logger, get_tqdm, load_search_cv_config
 
 
-def get_model(model_name, config_path):
+def get_model(model_name, config_path, is_normalize=False):
     config_args = load_search_cv_config(config_path)
 
     model = ModelSelections[model_name].value
-    model = model["base"](**model["init_args"])
+    model = model["base"](is_normalize=is_normalize, **model["init_args"])
     model.build_model(config_args=config_args)
 
     return model
@@ -98,7 +100,8 @@ class RollingMethod:
 
 class SklearnGeneralModel(ModelBase):
 
-    def __init__(self, model, searchCV=False):
+    def __init__(self, is_normalize, model, searchCV=False):
+        self.is_normalize = is_normalize
         self.model = model
         self.searchCV = searchCV
 
@@ -113,9 +116,15 @@ class SklearnGeneralModel(ModelBase):
             self.model = BayesSearchCV(estimator=self.model(), **config_args)
 
     def train(self, x, y):
+        if self.is_normalize:
+            self.scaler = Normalizer()
+            x = self.scaler.fit_transform(x)
+
         self.model.fit(x, y)
 
     def predict(self, x):
+        if self.is_normalize:
+            x = self.scaler.transform(x)
         return self.model.predict(x)
 
     def feature_based_metrics(self, columns=None, index=None):
@@ -124,8 +133,8 @@ class SklearnGeneralModel(ModelBase):
 
 class StatsRegressionModel(ModelBase):
 
-    def __init__(self):
-        pass
+    def __init__(self, is_normalize):
+        self.is_normalize = is_normalize
 
     def build_model(self, config_args=None):
         if config_args is None:
@@ -137,19 +146,29 @@ class StatsRegressionModel(ModelBase):
             self.intercept = False
 
     def train(self, x, y):
+        if self.is_normalize:
+            self.scaler = Normalizer()
+            x = self.scaler.fit_transform(x)
+
         x = sm.add_constant(x, has_constant='add') if self.intercept else x
         self.model = sm.OLS(y, x)
         self.result = self.model.fit()
 
     def predict(self, x):
+        if self.is_normalize:
+            x = self.scaler.transform(x)
+
+        x = sm.add_constant(x, has_constant='add') if self.intercept else x
         return np.array(self.result.predict(x))
 
     def feature_based_metrics(self, columns=None, index=None):
         """
         Will also generate the t-stats for each feature
         """
-        return pd.DataFrame(
-            self.result.tvalues, index=columns, columns=index).T
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            return pd.DataFrame(
+                self.result.tvalues, index=columns, columns=index).T
 
 
 class ModelSelections(Enum):

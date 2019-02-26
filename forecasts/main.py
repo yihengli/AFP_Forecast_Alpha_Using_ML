@@ -72,11 +72,14 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
                    "effective when rolling is off")
 @click.option('--multiprocess/--no-multiprocess', default=False,
               show_default=True, help='Multiprocess when possible')
+@click.option('--standardize-features/--no-standardize-features',
+              default=False, show_default=True,
+              help='Whether to standardize the features before fitting')
 @click.pass_context
 def forecast(ctx, tickers, label_path, feature_path, freq, model, label,
              label_cache, lags, features, config_path, rolling, rolling_bars,
              forward_bars, predict_bars, train_periods, test_periods,
-             minimum_train_bars, multiprocess):
+             minimum_train_bars, multiprocess, standardize_features):
 
     name = ctx.obj['name']
     output = ctx.obj['output']
@@ -86,7 +89,8 @@ def forecast(ctx, tickers, label_path, feature_path, freq, model, label,
                  label_cache, lags, features, model, train_periods,
                  test_periods, config_path, rolling, rolling_bars,
                  forward_bars, predict_bars, minimum_train_bars, debug,
-                 is_multiprocess=multiprocess)
+                 is_multiprocess=multiprocess,
+                 is_normalize=standardize_features)
 
 
 if __name__ == '__main__':
