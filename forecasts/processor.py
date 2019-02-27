@@ -1,11 +1,14 @@
 import os
-import pandas as pd
-import numpy as np
-from enum import Enum
-from abc import ABC, abstractmethod
-from utils import get_tqdm, get_logger
-from pathos.helpers import cpu_count, ProcessPool as Pool
 import pickle
+from abc import ABC, abstractmethod
+from enum import Enum
+
+import numpy as np
+import pandas as pd
+
+from pathos.helpers import ProcessPool as Pool
+from pathos.helpers import cpu_count
+from utils import get_logger, get_tqdm
 
 
 def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,

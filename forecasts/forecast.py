@@ -1,9 +1,11 @@
-from processor import get_labels, get_features
-from models import RollingMethod, get_model
-from utils import get_logger, get_tqdm, _get_between
-import pandas as pd
-import numpy as np
 import os
+
+import numpy as np
+import pandas as pd
+
+from models import RollingMethod, get_model
+from processor import get_features, get_labels
+from utils import _get_between, get_logger, get_tqdm
 
 
 def train_and_predict(name, label, lags, features, model, train_periods,

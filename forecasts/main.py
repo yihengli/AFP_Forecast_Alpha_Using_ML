@@ -1,8 +1,10 @@
-import click
-from processor import TaskFeatures, TaskLabels
-from models import ModelSelections
-import forecast as fct
 import os
+
+import click
+
+import forecast as fct
+from models import ModelSelections
+from processor import TaskFeatures, TaskLabels
 
 
 @click.group()

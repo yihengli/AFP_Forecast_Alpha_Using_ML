@@ -1,9 +1,22 @@
-import pandas as pd
-import sklearn.metrics as mt
-import numpy as np
+# flake8: noqa E402
+
+from utils import (_get_between, _get_common_nonnull, append_df_to_excel,
+                   get_logger, get_tqdm)
 from processor import get_labels
-from utils import get_logger, get_tqdm, _get_between, _get_common_nonnull,\
-    append_df_to_excel
+from typing import Iterable, Optional
+import sklearn.metrics as mt
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+import matplotlib as mpl
+mpl.use('Agg')
+
+
+plt.style.use('seaborn')
+mpl.rcParams['legend.frameon'] = True
+mpl.rcParams['legend.facecolor'] = 'w'
 
 
 REGRESSION_METRICS = {
@@ -38,10 +51,16 @@ class AnalyzerSingle:
         return pd.DataFrame(res, index=[name])
 
     @staticmethod
-    def get_rolling_metric(y_true, y_pred, metric='cum_abs_error', name=None):
+    def get_rolling_metric(y_true, y_pred, metric='cum_squared_error',
+                           name=None):
 
         if metric == 'cum_abs_error':
             errors = np.abs(y_true - y_pred)
+            res = errors.cumsum()
+            res.name = name
+            return res
+        elif metric == 'cum_squared_error':
+            errors = (y_true - y_pred)**2
             res = errors.cumsum()
             res.name = name
             return res
@@ -63,20 +82,21 @@ class Analyzer:
         if is_debug:
             logger.info(text)
 
-    def analyze(self, pred_path, train_periods, test_periods, is_debug=False,
+    def analyze(self, pred_path, fromdate, todate, is_debug=False,
                 show_rolling=True, output_file=None,
-                rolling_metric='cum_abs_error', **label_args):
+                rolling_metric='cum_squared_error', **label_args):
         logger = get_logger()
         tqdm, ascii = get_tqdm()
-        labels = get_labels(fromdate=train_periods[0], todate=test_periods[1],
+        labels = get_labels(fromdate=fromdate, todate=todate,
                             is_debug=is_debug, **label_args)
-        preds = load_predictions(pred_path)
+        all_preds = load_predictions(pred_path)
 
-        metric_res = {'IS': [], 'OOS': []}
-        rolling_res = {'IS': [], 'OOS': []}
+        metrics = []
+        rollings = []
 
         fails = 0
-        for ticker in tqdm(preds.columns, ascii=ascii):
+        loop_tickers = set(labels.keys()).intersection(set(all_preds.columns))
+        for ticker in tqdm(loop_tickers, ascii=ascii):
             self.log('Analyzing <%s>' % ticker, is_debug)
 
             if ticker not in labels.keys():
@@ -84,66 +104,45 @@ class Analyzer:
                 fails += 1
                 continue
 
+            # Get true / pred values
             label = labels[ticker]
-            train_true = _get_between(label, *train_periods)
-            test_true = _get_between(label, *test_periods)
-            train_pred = _get_between(preds[ticker], *train_periods)
-            test_pred = _get_between(preds[ticker], *test_periods)
+            trues = _get_between(label, fromdate, todate)
 
-            train_true, train_pred = _get_common_nonnull(train_true,
-                                                         train_pred)
-            test_true, test_pred = _get_common_nonnull(test_true, test_pred)
+            preds = _get_between(all_preds[ticker], fromdate, todate)
+            trues, preds = _get_common_nonnull(trues, preds)
 
             # Check Data Validations
-            if len(train_pred) == 0:
-                logger.error('<%s>: Not Enough In Sample Predictions!'
-                             % ticker)
-                fails += 1
-                continue
-            if len(test_pred) == 0:
-                logger.error('<%s>: Not Enough Out Sample Preditions!'
-                             % ticker)
+            if len(preds) == 0:
+                logger.error('<%s>: Not Enough Predictions!' % ticker)
                 fails += 1
                 continue
 
             # Calculate Regression metrics
-            metric_res['IS'].append(AnalyzerSingle.get_regression_metrics(
-                train_true, train_pred, name=ticker))
-            metric_res['OOS'].append(AnalyzerSingle.get_regression_metrics(
-                test_true, test_pred, name=ticker))
+            metrics.append(AnalyzerSingle.get_regression_metrics(
+                trues, preds, name=ticker
+            ))
 
             # Calculate Rolling Cumulative Errors
             if show_rolling:
-                rolling_res['IS'].append(AnalyzerSingle.get_rolling_metric(
-                    train_true, train_pred, rolling_metric, name=ticker))
-                rolling_res['OOS'].append(AnalyzerSingle.get_rolling_metric(
-                    test_true, test_pred, rolling_metric, name=ticker))
+                rollings.append(AnalyzerSingle.get_rolling_metric(
+                    trues, preds, rolling_metric, name=ticker
+                ))
 
+        # Concatenate results as dataframes
         logger.info('Task Finished: %d Attempted and %d Failed.' %
-                    (len(preds.columns), fails))
-        metric_res['IS'] = pd.concat(metric_res['IS'])
-        metric_res['OOS'] = pd.concat(metric_res['OOS'])
-
+                    (len(loop_tickers), fails))
+        metrics = pd.concat(metrics)
         if show_rolling:
-            rolling_res['IS'] = pd.concat(rolling_res['IS'], 1)
-            rolling_res['OOS'] = pd.concat(rolling_res['OOS'], 1)
+            rolling_res = pd.concat(rollings, 1)
 
         if output_file is not None:
             logger.info('Writing to file.. <%s>' % output_file)
-            metric_res['IS'].to_excel(output_file, sheet_name='Metrics IS')
-            append_df_to_excel(output_file, metric_res['OOS'],
-                               sheet_name='Metrics OOS')
+            metrics.to_csv(output_file)
+
             if show_rolling:
-                append_df_to_excel(output_file, rolling_res['IS'],
-                                   sheet_name='Rolling %s IS'
-                                   % rolling_metric)
-                append_df_to_excel(output_file, rolling_res['OOS'],
-                                   sheet_name='Rolling %s OOS'
-                                   % rolling_metric)
+                rollings.to_csv(output_file)
 
         return {
-            'Metrics_IS': metric_res['IS'],
-            'Metrics_OOS': metric_res['OOS'],
-            'Rolling_IS': rolling_res['IS'],
-            'Rolling_OOS': rolling_res['OOS']
+            'Metrics': metrics,
+            'Rolling': rollings
         }
