@@ -1,9 +1,11 @@
-from processor import get_labels, get_features
-from models import RollingMethod, get_model
-from utils import get_logger, get_tqdm, _get_between
-import pandas as pd
-import numpy as np
 import os
+
+import numpy as np
+import pandas as pd
+
+from models import RollingMethod, get_model
+from processor import get_features, get_labels
+from utils import _get_between, get_logger, get_tqdm
 
 
 def train_and_predict(name, label, lags, features, model, train_periods,
@@ -73,7 +75,7 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
              label_cache, lags, features, model, train_periods, test_periods,
              config_path, is_rolling=False, rolling_bars=0, forward_bars=0,
              predict_bars=0, minimum_train_bars=90, is_debug=False,
-             is_multiprocess=False):
+             is_multiprocess=False, is_normalize=False):
     logger = get_logger()
     tqdm, ascii = get_tqdm()
 
@@ -116,7 +118,8 @@ def forecast(name, output, tickers, label_path, feature_path, freq, label,
 
         _label = labels[k]
         _feature = features[k]
-        _model = get_model(model, config_path=config_path)
+        _model = get_model(model, is_normalize=is_normalize,
+                           config_path=config_path)
 
         try:
             pred, other_metrics = train_and_predict(

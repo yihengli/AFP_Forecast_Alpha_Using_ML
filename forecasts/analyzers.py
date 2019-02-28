@@ -1,9 +1,20 @@
-import pandas as pd
-import sklearn.metrics as mt
-import numpy as np
+from utils import _get_between, _get_common_nonnull, get_logger, get_tqdm
 from processor import get_labels
-from utils import get_logger, get_tqdm, _get_between, _get_common_nonnull,\
-    append_df_to_excel
+import sklearn.metrics as mt
+import pandas as pd
+from pandas.plotting import register_matplotlib_converters
+import numpy as np
+import seaborn as sns
+from typing import Dict, Optional, List
+
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt  # noqa E402
+
+register_matplotlib_converters()
+plt.style.use('seaborn')
+mpl.rcParams['legend.frameon'] = True
+mpl.rcParams['legend.facecolor'] = 'w'
 
 
 REGRESSION_METRICS = {
@@ -38,13 +49,17 @@ class AnalyzerSingle:
         return pd.DataFrame(res, index=[name])
 
     @staticmethod
-    def get_rolling_metric(y_true, y_pred, metric='cum_abs_error', name=None):
+    def get_rolling_metric(y_true, y_pred, metric='squared_error',
+                           name=None):
 
-        if metric == 'cum_abs_error':
+        if metric == 'abs_error':
             errors = np.abs(y_true - y_pred)
-            res = errors.cumsum()
-            res.name = name
-            return res
+            errors.name = name
+            return errors
+        elif metric == 'squared_error':
+            errors = (y_true - y_pred)**2
+            errors.name = name
+            return errors
         else:
             func = REGRESSION_METRICS[metric]
             res = [np.nan]
@@ -63,20 +78,22 @@ class Analyzer:
         if is_debug:
             logger.info(text)
 
-    def analyze(self, pred_path, train_periods, test_periods, is_debug=False,
+    def analyze(self, pred_path, fromdate, todate, is_debug=False,
                 show_rolling=True, output_file=None,
-                rolling_metric='cum_abs_error', **label_args):
+                rolling_metric='squared_error', labels=None, **label_args):
         logger = get_logger()
         tqdm, ascii = get_tqdm()
-        labels = get_labels(fromdate=train_periods[0], todate=test_periods[1],
-                            is_debug=is_debug, **label_args)
-        preds = load_predictions(pred_path)
+        if labels is None:
+            labels = get_labels(fromdate=fromdate, todate=todate,
+                                is_debug=is_debug, **label_args)
+        all_preds = load_predictions(pred_path)
 
-        metric_res = {'IS': [], 'OOS': []}
-        rolling_res = {'IS': [], 'OOS': []}
+        metrics = []
+        rollings = []
 
         fails = 0
-        for ticker in tqdm(preds.columns, ascii=ascii):
+        loop_tickers = set(labels.keys()).intersection(set(all_preds.columns))
+        for ticker in tqdm(loop_tickers, ascii=ascii):
             self.log('Analyzing <%s>' % ticker, is_debug)
 
             if ticker not in labels.keys():
@@ -84,66 +101,166 @@ class Analyzer:
                 fails += 1
                 continue
 
+            # Get true / pred values
             label = labels[ticker]
-            train_true = _get_between(label, *train_periods)
-            test_true = _get_between(label, *test_periods)
-            train_pred = _get_between(preds[ticker], *train_periods)
-            test_pred = _get_between(preds[ticker], *test_periods)
+            trues = _get_between(label, fromdate, todate)
 
-            train_true, train_pred = _get_common_nonnull(train_true,
-                                                         train_pred)
-            test_true, test_pred = _get_common_nonnull(test_true, test_pred)
+            preds = _get_between(all_preds[ticker], fromdate, todate)
+            trues, preds = _get_common_nonnull(trues, preds)
 
             # Check Data Validations
-            if len(train_pred) == 0:
-                logger.error('<%s>: Not Enough In Sample Predictions!'
-                             % ticker)
-                fails += 1
-                continue
-            if len(test_pred) == 0:
-                logger.error('<%s>: Not Enough Out Sample Preditions!'
-                             % ticker)
+            if len(preds) == 0:
+                logger.error('<%s>: Not Enough Predictions!' % ticker)
                 fails += 1
                 continue
 
             # Calculate Regression metrics
-            metric_res['IS'].append(AnalyzerSingle.get_regression_metrics(
-                train_true, train_pred, name=ticker))
-            metric_res['OOS'].append(AnalyzerSingle.get_regression_metrics(
-                test_true, test_pred, name=ticker))
+            metrics.append(AnalyzerSingle.get_regression_metrics(
+                trues, preds, name=ticker
+            ))
 
             # Calculate Rolling Cumulative Errors
             if show_rolling:
-                rolling_res['IS'].append(AnalyzerSingle.get_rolling_metric(
-                    train_true, train_pred, rolling_metric, name=ticker))
-                rolling_res['OOS'].append(AnalyzerSingle.get_rolling_metric(
-                    test_true, test_pred, rolling_metric, name=ticker))
+                rollings.append(AnalyzerSingle.get_rolling_metric(
+                    trues, preds, rolling_metric, name=ticker
+                ))
 
+        # Concatenate results as dataframes
         logger.info('Task Finished: %d Attempted and %d Failed.' %
-                    (len(preds.columns), fails))
-        metric_res['IS'] = pd.concat(metric_res['IS'])
-        metric_res['OOS'] = pd.concat(metric_res['OOS'])
-
+                    (len(loop_tickers), fails))
+        metrics = pd.concat(metrics)
         if show_rolling:
-            rolling_res['IS'] = pd.concat(rolling_res['IS'], 1)
-            rolling_res['OOS'] = pd.concat(rolling_res['OOS'], 1)
+            rollings = pd.concat(rollings, 1)
 
         if output_file is not None:
             logger.info('Writing to file.. <%s>' % output_file)
-            metric_res['IS'].to_excel(output_file, sheet_name='Metrics IS')
-            append_df_to_excel(output_file, metric_res['OOS'],
-                               sheet_name='Metrics OOS')
+            metrics.to_csv(output_file)
+
             if show_rolling:
-                append_df_to_excel(output_file, rolling_res['IS'],
-                                   sheet_name='Rolling %s IS'
-                                   % rolling_metric)
-                append_df_to_excel(output_file, rolling_res['OOS'],
-                                   sheet_name='Rolling %s OOS'
-                                   % rolling_metric)
+                rollings.to_csv(output_file)
 
         return {
-            'Metrics_IS': metric_res['IS'],
-            'Metrics_OOS': metric_res['OOS'],
-            'Rolling_IS': rolling_res['IS'],
-            'Rolling_OOS': rolling_res['OOS']
+            'Metrics': metrics,
+            'Rolling': rollings
         }
+
+
+class Plotter:
+
+    def __init__(self,
+                 pred_paths: List[str],
+                 item_names: List[str],
+                 fromdate: str,
+                 todate: str,
+                 rolling_metric: str = 'squared_error',
+                 label_args: Optional[Dict] = None) -> None:
+
+        self.pred_path = pred_paths
+        self.item_names = item_names
+        self.fromdate = fromdate
+        self.todate = todate
+        self.rolling_metric = rolling_metric
+
+        if label_args is None:
+            label_args = {}
+        self.label_args = label_args
+
+        self.results: Dict = {}
+
+        cmap = sns.color_palette()
+        self.colors = [mpl.colors.rgb2hex(c[:3]) for c in cmap]
+
+    @staticmethod
+    def _exclude_outliers(df: pd.DataFrame, col: str) -> pd.DataFrame:
+        return df[df[col] <= df[col].quantile(.99) * 5]
+
+    def _set_common_stocks(self) -> None:
+        stocks = None
+        for name in self.item_names:
+            if stocks is None:
+                stocks = set(self.results[name]['Metrics'].index)
+            else:
+                stocks = stocks.intersection(
+                    set(self.results[name]['Metrics'].index))
+
+        self.stocks = stocks
+
+    def set_analyzers(self, exclude_outlier: bool = True) -> None:
+        analyzer = Analyzer()
+        logger = get_logger()
+
+        labels = get_labels(fromdate=self.fromdate, todate=self.todate,
+                            is_debug=False, **self.label_args)
+
+        for pred, name in zip(self.pred_path, self.item_names):
+            logger.info("Analyzing %s..." % name)
+
+            self.results[name] = analyzer.analyze(
+                pred_path=pred,
+                fromdate=self.fromdate,
+                todate=self.todate,
+                rolling_metric=self.rolling_metric,
+                labels=labels
+            )
+
+            if exclude_outlier:
+                self.results[name]["Metrics"] = self._exclude_outliers(
+                    self.results[name]["Metrics"], 'RMSE')
+
+        self._set_common_stocks()
+
+    def get_performance_table(self, metric: str = 'RMSE') -> pd.DataFrame:
+        res = []
+        for name in self.item_names:
+            data = self.results[name]['Metrics'][metric]
+            data = data.loc[self.stocks]
+            res.append(data.describe())
+
+        res_df = pd.concat(res, 1)
+        res_df.columns = ['(%s) %s' % (metric, name)
+                          for name in self.item_names]
+        return res_df
+
+    def get_distribution_plot(self, metric: str = 'RMSE') -> mpl.figure.Figure:
+        rows = int(np.ceil(len(self.item_names) / 2))
+        fig, axes = plt.subplots(rows, 2, figsize=(14, rows * 5))
+        axes = axes.flatten()
+
+        for ax, name, color in zip(axes, self.item_names, self.colors):
+            data = self.results[name]['Metrics'][metric]
+            data = data.loc[self.stocks]
+
+            data.hist(ax=ax, bins=30, color=color)
+            ax.set_title("%s (%s)" % (name, metric), fontweight=700)
+            ax.axvline(data.mean(), color='red', ls=':',
+                       label="Average %s" % metric)
+            ax.annotate('%.5f' % data.mean(), xy=(data.mean(), 0),
+                        xytext=(2, 2), textcoords='offset points', color='w')
+            ax.legend()
+
+        if len(axes) > len(self.item_names):
+            axes[-1].set_visible(False)
+
+        return fig
+
+    def get_cumulative_metrics_plot(self) -> mpl.figure.Figure:
+
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+        if self.rolling_metric not in REGRESSION_METRICS:
+            condition = 'Rolling'
+        else:
+            condition = 'Cumulative'
+
+        ax.set_title('%s %s Over Time' % (condition, self.rolling_metric),
+                     fontweight=700)
+
+        for name, color in zip(self.item_names, self.colors):
+            data = self.results[name]['Rolling'][self.stocks].mean(1)
+            if self.rolling_metric not in REGRESSION_METRICS:
+                ax.plot(data.cumsum(), color=color, label=name)
+            else:
+                ax.plot(data, color=color, label=name)
+
+        ax.legend()
+
+        return fig
