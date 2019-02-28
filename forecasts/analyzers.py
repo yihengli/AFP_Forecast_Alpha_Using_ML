@@ -2,14 +2,16 @@ from utils import _get_between, _get_common_nonnull, get_logger, get_tqdm
 from processor import get_labels
 import sklearn.metrics as mt
 import pandas as pd
+from pandas.plotting import register_matplotlib_converters
 import numpy as np
 import seaborn as sns
-from typing import Dict, Iterable, Optional
+from typing import Dict, Optional, List
 
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt  # noqa E402
 
+register_matplotlib_converters()
 plt.style.use('seaborn')
 mpl.rcParams['legend.frameon'] = True
 mpl.rcParams['legend.facecolor'] = 'w'
@@ -146,12 +148,13 @@ class Analyzer:
 class Plotter:
 
     def __init__(self,
-                 pred_paths: Iterable[str],
-                 item_names: Iterable[str],
+                 pred_paths: List[str],
+                 item_names: List[str],
                  fromdate: str,
                  todate: str,
                  rolling_metric: str = 'squared_error',
                  label_args: Optional[Dict] = None) -> None:
+
         self.pred_path = pred_paths
         self.item_names = item_names
         self.fromdate = fromdate
@@ -162,7 +165,7 @@ class Plotter:
             label_args = {}
         self.label_args = label_args
 
-        self.results = {}
+        self.results: Dict = {}
 
         cmap = sns.color_palette()
         self.colors = [mpl.colors.rgb2hex(c[:3]) for c in cmap]
@@ -213,9 +216,10 @@ class Plotter:
             data = data.loc[self.stocks]
             res.append(data.describe())
 
-        res = pd.concat(res, 1)
-        res.columns = ['(%s) %s' % (metric, name) for name in self.item_names]
-        return res
+        res_df = pd.concat(res, 1)
+        res_df.columns = ['(%s) %s' % (metric, name)
+                          for name in self.item_names]
+        return res_df
 
     def get_distribution_plot(self, metric: str = 'RMSE') -> mpl.figure.Figure:
         rows = int(np.ceil(len(self.item_names) / 2))
@@ -242,7 +246,12 @@ class Plotter:
     def get_cumulative_metrics_plot(self) -> mpl.figure.Figure:
 
         fig, ax = plt.subplots(1, 1, figsize=(10, 4))
-        ax.set_title('Cumulative %s Over Time' % self.rolling_metric,
+        if self.rolling_metric not in REGRESSION_METRICS:
+            condition = 'Rolling'
+        else:
+            condition = 'Cumulative'
+
+        ax.set_title('%s %s Over Time' % (condition, self.rolling_metric),
                      fontweight=700)
 
         for name, color in zip(self.item_names, self.colors):
