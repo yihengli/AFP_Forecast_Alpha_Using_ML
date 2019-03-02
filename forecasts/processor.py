@@ -105,8 +105,7 @@ class YahooProcessor(LabelProcessor):
         if forward_bars == 0:
             returns = df[data_col].pct_change()
         else:
-            returns = (df[data_col].shift(-forward_bars) /
-                       df[data_col].shift(-1) - 1).shift(1)
+            returns = (df[data_col].shift(-forward_bars) / df[data_col] - 1)
 
         if is_log:
             return np.log(1 + returns)
