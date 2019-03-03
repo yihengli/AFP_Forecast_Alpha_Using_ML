@@ -64,7 +64,7 @@ def train_and_predict(name, label, lags, features, model, train_periods,
 
         if other_metrics is not None:
             other_metrics.index = name + ' ' + \
-                other_metrics.index.astype('str')
+                label.index[other_metrics.index].strftime('%Y-%m-%d')
 
         res = pd.Series(preds, index=label.index)
 
