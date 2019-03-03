@@ -1,0 +1,41 @@
+# Possible Args (The belows are defaults if not specified)
+# ---------------------------------------
+#   search_spaces, 
+#   optimizer_kwargs=None
+#   n_iter=50
+#   scoring=None
+#   fit_params=None
+#   n_jobs=1
+#   n_points=1
+#   iid=True
+#   refit=True
+#   cv=None
+#   verbose=0, 
+#   pre_dispatch='2*n_jobs'
+#   random_state=None
+#   error_score='raise'
+#   return_train_score=
+#
+# How to Specify `search_spaces` parameter
+# ---------------------
+#   - Use `Real` to represent real value range
+#   - Use `Integer` to represent integer value range
+#   - Use `Category` to represent categorical choices
+#   - For `Real` and `Integer`, the following list[0, 1] where [0] is lower
+#     bound and [1] is upper bound
+#   - For `Real`, one can additionally specify `log-uniform` when search CV
+#   - For `Categorial`, a following list without limitation regarding its size
+#
+# The folliwng items are examples for sklearn.ensemble.GradientBoostingClassifier
+
+search_spaces:
+  learning_rate : {Real: [0.01, 1., 'log-uniform']}
+  n_estimators : {Integer: [100, 3000]}
+  max_depth  : {Integer: [2, 10]}
+  num_leaves : {Integer: [20, 50]}
+  reg_alpha : {Real: [0., 0.5]}
+  reg_lambda : {Real: [0., 0.5]}
+n_iter: 15
+n_jobs: -1
+random_state: 123
+cv: 3
