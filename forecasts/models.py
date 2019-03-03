@@ -8,6 +8,7 @@ import statsmodels.api as sm
 from sklearn import ensemble as ens
 from sklearn import linear_model as lm
 from sklearn.preprocessing import Normalizer
+import lightgbm as lgb
 
 from skopt import BayesSearchCV
 from utils import get_logger, get_tqdm, load_search_cv_config
@@ -194,6 +195,14 @@ class ModelSelections(Enum):
         "base": SklearnGeneralModel,
         "init_args": {
             "model": ens.GradientBoostingRegressor,
+            "searchCV": True
+        }
+    }
+
+    LightGBM = {
+        "base": SklearnGeneralModel,
+        "init_args": {
+            "model": lgb.LGBMRegressor,
             "searchCV": True
         }
     }
