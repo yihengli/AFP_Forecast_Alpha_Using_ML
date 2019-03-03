@@ -78,6 +78,7 @@ dependencies:
   - scikit-learn=0.20.2
   - scikit-optimize=0.5.2
   - scipy=1.2.0
+  - seaborn=0.9.0
   - send2trash=1.5.0
   - setuptools=40.7.3
   - sip=4.19.8

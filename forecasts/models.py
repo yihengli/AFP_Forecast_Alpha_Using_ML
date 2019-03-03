@@ -131,9 +131,9 @@ class SklearnGeneralModel(ModelBase):
         return self.model.predict(x)
 
     def feature_based_metrics(self, columns=None, index=None):
-        return pd.DataFrame(
-            self.model.best_estimator_.feature_importances_,
-            index=columns, columns=index).T
+        feature_importance = self.model.best_estimator_.feature_importances_
+        feature_importance = feature_importance / np.sum(feature_importance)
+        return pd.DataFrame(feature_importance, index=columns, columns=index).T
 
 
 class StatsRegressionModel(ModelBase):

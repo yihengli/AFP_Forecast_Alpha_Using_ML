@@ -31,8 +31,7 @@
 search_spaces:
   learning_rate : {Real: [0.01, 1., 'log-uniform']}
   n_estimators : {Integer: [100, 3000]}
-  max_depth  : {Integer: [2, 10]}
-  num_leaves : {Integer: [20, 50]}
+  num_leaves : {Integer: [20, 1000]}
   reg_alpha : {Real: [0., 0.5]}
   reg_lambda : {Real: [0., 0.5]}
 n_iter: 15
