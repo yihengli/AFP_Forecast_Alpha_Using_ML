@@ -367,3 +367,68 @@ class Plotter:
         Plotter.plot_cum_lines(ax, datasets, self.item_names,
                                self.colors, metric, self.rolling_bars, q)
         return fig
+
+    def get_sector_distributions(self,
+                                 metric: str = 'RMSE',
+                                 figsize: Tuple[float] = (10, 30)) -> mpl.figure.Figure:  # noqa 501
+
+        def get_merged_df(name):
+            metrics = self.results[name]['Metrics']
+            meta = self.meta_data
+            return pd.merge(metrics, meta, left_index=True, right_on='Symbol',
+                            how='left')
+
+        datasets = [get_merged_df(name) for name in self.item_names]
+        Sectors = datasets[0]['Sector'].dropna().unique()
+
+        col = len(self.item_names)
+        row = len(Sectors)
+
+        fig, ax = plt.subplots(row, col, figsize=figsize)
+        axes = ax.flatten()
+
+        for i, sector in enumerate(Sectors):
+            for s in range(col):
+                df, name = datasets[s], self.item_names[s]
+                self.plot_histogram(axes[i*2+s],
+                                    df[df['Sector'] == sector][metric],
+                                    self.colors[s], '<%s> %s' % (sector, name),
+                                    metric)
+
+        fig.tight_layout()
+        return fig
+
+    def get_marketcap_distribution(self, metric: str = 'RMSE', cuts: int = 5,
+                                   figsize: Tuple[float] = (10, 10)) -> mpl.figure.Figure:  # noqa 501
+
+        def get_merged_df(name):
+            metrics = self.results[name]['Metrics']
+            meta = self.meta_data
+            return pd.merge(metrics, meta, left_index=True, right_on='Symbol',
+                            how='left')
+
+        def get_quantiled_df(df, cuts, labels):
+            df['Cap'] = pd.qcut(df['MarketCap'], q=cuts, retbins=True,
+                                labels=labels)[0]
+            return df
+
+        col = len(self.item_names)
+        row = cuts
+
+        labels = ['q%d' % i for i in range(cuts)]
+
+        fig, ax = plt.subplots(row, col, figsize=(10, 10), sharex=True)
+        axes = ax.flatten()
+
+        datasets = [get_quantiled_df(get_merged_df(name), cuts, labels)
+                    for name in self.item_names]
+
+        for i, label in enumerate(labels):
+            for c in range(col):
+                df, name = datasets[c], self.item_names[c]
+                self.plot_histogram(axes[i*2+c],
+                                    df[df['Cap'] == label][metric],
+                                    self.colors[c], '<%s> %s' % (label, name),
+                                    metric)
+
+        fig.tight_layout()
