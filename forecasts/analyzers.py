@@ -17,11 +17,21 @@ mpl.rcParams['legend.frameon'] = True
 mpl.rcParams['legend.facecolor'] = 'w'
 
 
+def get_binary_labels(y):
+    x = y.copy()
+    x[x > 0] = 1
+    x[x <= 0] = 0
+    return x
+
+
 REGRESSION_METRICS = {
     'RMSE': lambda y_true, y_pred:
         np.sqrt(mt.mean_squared_error(y_true, y_pred)),
     'MAE': mt.median_absolute_error,
     'R2': mt.r2_score,
+    'Accuracy': lambda y_true, y_pred:
+        mt.accuracy_score(get_binary_labels(y_true),
+                          get_binary_labels(y_pred)),
     'SIZE': lambda y_true, y_pred: len(y_pred)
 }
 
@@ -80,7 +90,7 @@ class Analyzer:
 
     def analyze(self, pred_path, fromdate, todate, is_debug=False,
                 show_rolling=True, output_file=None,
-                rolling_metric='squared_error', labels=None, **label_args):
+                rolling_metrics=['squared_error'], labels=None, **label_args):
         logger = get_logger()
         tqdm, ascii = get_tqdm()
         if labels is None:
@@ -89,7 +99,9 @@ class Analyzer:
         all_preds = load_predictions(pred_path)
 
         metrics = []
-        rollings = []
+        rollings = {}
+        for rolling_metric in rolling_metrics:
+            rollings[rolling_metric] = []
 
         fails = 0
         loop_tickers = set(labels.keys()).intersection(set(all_preds.columns))
@@ -121,23 +133,31 @@ class Analyzer:
 
             # Calculate Rolling Cumulative Errors
             if show_rolling:
-                rollings.append(AnalyzerSingle.get_rolling_metric(
-                    trues, preds, rolling_metric, name=ticker
-                ))
+                for rolling_metric in rolling_metrics:
+                    rollings[rolling_metric].append(
+                        AnalyzerSingle.get_rolling_metric(
+                            trues, preds, rolling_metric, name=ticker
+                        )
+                    )
 
         # Concatenate results as dataframes
         logger.info('Task Finished: %d Attempted and %d Failed.' %
                     (len(loop_tickers), fails))
         metrics = pd.concat(metrics)
         if show_rolling:
-            rollings = pd.concat(rollings, 1)
+            for rolling_metric in rolling_metrics:
+                rollings[rolling_metric] = pd.concat(rollings[rolling_metric],
+                                                     1)
 
         if output_file is not None:
             logger.info('Writing to file.. <%s>' % output_file)
             metrics.to_csv(output_file)
 
-            if show_rolling:
-                rollings.to_csv(output_file)
+            # Currently not handle rolling metrics, as it's still under
+            # developement
+            #
+            # if show_rolling:
+            #     rollings.to_csv(output_file)
 
         return {
             'Metrics': metrics,
@@ -152,14 +172,14 @@ class Plotter:
                  item_names: List[str],
                  fromdate: str,
                  todate: str,
-                 rolling_metric: str = 'squared_error',
+                 rolling_metrics: List[str] = ['squared_error'],
                  label_args: Optional[Dict] = None) -> None:
 
         self.pred_path = pred_paths
         self.item_names = item_names
         self.fromdate = fromdate
         self.todate = todate
-        self.rolling_metric = rolling_metric
+        self.rolling_metrics = rolling_metrics
 
         if label_args is None:
             label_args = {}
@@ -199,7 +219,7 @@ class Plotter:
                 pred_path=pred,
                 fromdate=self.fromdate,
                 todate=self.todate,
-                rolling_metric=self.rolling_metric,
+                rolling_metrics=self.rolling_metrics,
                 labels=labels
             )
 
@@ -223,7 +243,8 @@ class Plotter:
 
     def get_distribution_plot(self, metric: str = 'RMSE') -> mpl.figure.Figure:
         rows = int(np.ceil(len(self.item_names) / 2))
-        fig, axes = plt.subplots(rows, 2, figsize=(14, rows * 5))
+        fig, axes = plt.subplots(rows, 2, figsize=(14, rows * 5),
+                                 sharex=True, sharey=True)
         axes = axes.flatten()
 
         for ax, name, color in zip(axes, self.item_names, self.colors):
@@ -243,23 +264,35 @@ class Plotter:
 
         return fig
 
-    def get_cumulative_metrics_plot(self) -> mpl.figure.Figure:
+    def get_cumulative_metrics_plot(self,
+                                    metric: str = 'squared_error',
+                                    q1: float = 0.75,
+                                    q2: float = 0.25) -> mpl.figure.Figure:
 
         fig, ax = plt.subplots(1, 1, figsize=(10, 4))
-        if self.rolling_metric not in REGRESSION_METRICS:
-            condition = 'Rolling'
-        else:
+        if metric not in REGRESSION_METRICS:
             condition = 'Cumulative'
+        else:
+            condition = 'Rolling'
 
-        ax.set_title('%s %s Over Time' % (condition, self.rolling_metric),
-                     fontweight=700)
+        ax.set_title('%s %s Over Time' % (condition, metric), fontweight=700)
 
         for name, color in zip(self.item_names, self.colors):
-            data = self.results[name]['Rolling'][self.stocks].mean(1)
-            if self.rolling_metric not in REGRESSION_METRICS:
-                ax.plot(data.cumsum(), color=color, label=name)
+            rmean = self.results[name]['Rolling'][metric][self.stocks]\
+                 .quantile(.5, 1)
+            rup = self.results[name]['Rolling'][metric][self.stocks]\
+                .quantile(q1, 1)
+            rdown = self.results[name]['Rolling'][metric][self.stocks]\
+                .quantile(q2, 1)
+
+            if metric not in REGRESSION_METRICS:
+                ax.plot(rmean.cumsum(), color=color, label=name + ' Median')
+                ax.plot(rup.cumsum(), color=color, 
+                        label=name + ' {:.0%} Percentile'.format(q1), ls='-.')
+                ax.plot(rdown.cumsum(), color=color,
+                        label=name + ' {:.0%} Percentile'.format(q2), ls=':')
             else:
-                ax.plot(data, color=color, label=name)
+                ax.plot(rmean, color=color, label=name)
 
         ax.legend()
 
