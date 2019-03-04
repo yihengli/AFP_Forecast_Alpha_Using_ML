@@ -2,11 +2,12 @@ import logging
 import os
 
 import yaml
-from tqdm import tqdm, tqdm_notebook
-
-import colorlog
 import colorama
 from skopt.space import Integer, Categorical, Real
+from tqdm import tqdm, tqdm_notebook
+colorama.deinit()  # avoid init twice
+
+import colorlog  # noqa: E501
 
 
 def load_search_cv_config(path_config):

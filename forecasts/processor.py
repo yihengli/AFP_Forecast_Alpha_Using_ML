@@ -105,8 +105,7 @@ class YahooProcessor(LabelProcessor):
         if forward_bars == 0:
             returns = df[data_col].pct_change()
         else:
-            returns = (df[data_col].shift(-forward_bars) /
-                       df[data_col].shift(-1) - 1).shift(1)
+            returns = (df[data_col].shift(-forward_bars) / df[data_col] - 1)
 
         if is_log:
             return np.log(1 + returns)
@@ -194,9 +193,76 @@ class FamaFrenchBasicProcessor(FeatureProcessor):
         return data
 
 
+class FamaFrenchFiveFactorProcessor(FeatureProcessor):
+
+    @staticmethod
+    def get_default_folder():
+        return os.path.abspath(
+            os.path.join(os.path.dirname(__file__), os.pardir,
+                         "F-F_Research_Data_5_Factors_2x3_daily.csv"))
+
+    @staticmethod
+    def load_data(ticker=None, folder=None):
+        if folder is None:
+            folder = FamaFrenchFiveFactorProcessor.get_default_folder()
+        df = pd.read_csv(folder)
+        df["date"] = pd.to_datetime(df["date"], format="%Y-%m-%d")
+        return df.set_index("date")
+
+    @staticmethod
+    def get_features(tickers=None, folder=None, freq='d',
+                     fromdate='2000-01-01', todate='2018-12-31',
+                     data_cols=None):
+        data = FamaFrenchFiveFactorProcessor.load_data(tickers, folder)
+
+        if data_cols is not None:
+            data = data[data_cols]
+
+        if freq != 'd':
+            data = data.resample(freq).apply(
+                lambda x: (x + 1).cumprod()[-1]-1)
+        data = data[(data.index <= todate) & (data.index >= fromdate)]
+        return data
+
+
+class FamaFrenchThreeFactorProcessor(FeatureProcessor):
+
+    @staticmethod
+    def get_default_folder():
+        return os.path.abspath(
+            os.path.join(os.path.dirname(__file__), os.pardir,
+                         "Fama-French Factors - Daily Frequency.csv"))
+
+    @staticmethod
+    def load_data(ticker=None, folder=None):
+        if folder is None:
+            folder = FamaFrenchThreeFactorProcessor.get_default_folder()
+        df = pd.read_csv(folder)
+        df["date"] = pd.to_datetime(df["date"], format="%Y/%m/%d")
+        df = df.set_index("date")
+        return df[['mktrf', 'smb', 'hml']]
+
+    @staticmethod
+    def get_features(tickers=None, folder=None, freq='d',
+                     fromdate='2000-01-01', todate='2018-12-31',
+                     data_cols=None):
+        data = FamaFrenchThreeFactorProcessor.load_data(tickers, folder)
+
+        if data_cols is not None:
+            data = data[data_cols]
+
+        if freq != 'd':
+            data = data.resample(freq).apply(
+                lambda x: (x + 1).cumprod()[-1]-1)
+        data = data[(data.index <= todate) & (data.index >= fromdate)]
+        return data
+
+
 class TaskLabels(Enum):
     yahoo = YahooProcessor
 
 
 class TaskFeatures(Enum):
     ff_basic = FamaFrenchBasicProcessor
+    ff_5 = FamaFrenchFiveFactorProcessor
+    ff_3 = FamaFrenchThreeFactorProcessor

@@ -47,7 +47,7 @@ FeatureList = list(map(lambda x: x.name, TaskFeatures))
 @click.option('--lags', default=1, show_default=True,
               help='How many lags to shift the label, this might be helpful '
                    'when solving a time-series prediction')
-@click.option('--features', default='ff_basic',
+@click.option('--features', default='ff_3',
               help='Name of features processors',
               type=click.Choice(FeatureList), show_default=True)
 @click.option('--config-path', default=None, show_default=True,
