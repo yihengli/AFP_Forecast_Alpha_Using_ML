@@ -8,7 +8,7 @@ import pandas as pd
 
 from pathos.helpers import ProcessPool as Pool
 from pathos.helpers import cpu_count
-from utils import get_logger, get_tqdm
+from utils import get_logger, get_tqdm, _get_between
 
 
 def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,
@@ -91,6 +91,41 @@ class FeatureProcessor(ABC):
     @abstractmethod
     def get_features(tickers, folder, fromdate, todate, data_cols):
         raise NotImplementedError
+
+
+class ResidualProcessor(LabelProcessor):
+
+    @staticmethod
+    def get_default_folder():
+        return os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                            'residuals'))
+
+    @staticmethod
+    def get_all_tickers(folder=None):
+        if folder is None:
+            folder = ResidualProcessor.get_default_folder()
+        df = pd.read_csv(os.path.join(folder, 'subset_true.csv'))
+        df.set_index('Date', inplace=True)
+        return df.columns.tolist()
+
+    @staticmethod
+    def get_returns(tickers, folder=None, freq='d', fromdate='2000-01-01',
+                    todate='2018-12-31', forward_bars=None, data_col=None,
+                    is_log=False, is_debug=False, is_multiprocess=False):
+        if folder is None:
+            folder = ResidualProcessor.get_default_folder()
+
+        df = pd.read_csv(os.path.join(folder, 'subset_error.csv'))
+        df.set_index('Date', inplace=True)
+        df.index = pd.to_datetime(df.index)
+
+        df = _get_between(df, fromdate, todate)
+
+        res = {}
+        for ticker in tickers:
+            res[ticker] = df[ticker].dropna()
+
+        return res
 
 
 class YahooProcessor(LabelProcessor):
@@ -283,6 +318,7 @@ class FamaFrenchThreeFactorProcessor(FeatureProcessor):
 
 class TaskLabels(Enum):
     yahoo = YahooProcessor
+    residual = ResidualProcessor
 
 
 class TaskFeatures(Enum):
