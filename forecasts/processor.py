@@ -13,7 +13,8 @@ from utils import get_logger, get_tqdm
 
 def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,
                data_col=None, save_cache=False, load_cache=False,
-               cache_name=None, is_debug=True, is_multiprocess=False):
+               cache_name=None, is_debug=True, is_multiprocess=False,
+               as_pandas=False):
     processor = TaskLabels[task].value
     logger = get_logger()
 
@@ -35,6 +36,28 @@ def get_labels(task, tickers, folder, freq, fromdate, todate, forward_bars,
             logger.info('Cache Processed Labels At %s...' % cache_name)
             with open(cache_name, 'wb') as handle:
                 pickle.dump(returns, handle)
+
+    def get_pandas_returns(true_values):
+
+        def build_dataframe(v, k):
+            df = pd.DataFrame(v)
+            df.columns = [k]
+            df.reset_index().drop_duplicates(subset='Date').set_index('Date')
+            return df
+
+        res = None
+        for k, v in true_values.items():
+            df = build_dataframe(v, k)
+            if res is None:
+                res = df
+            else:
+                res = pd.merge(res, df, left_index=True, right_index=True,
+                               how='outer')
+
+        return res
+
+    if as_pandas:
+        return get_pandas_returns(returns)
 
     return returns
 
@@ -142,12 +165,12 @@ class YahooProcessor(LabelProcessor):
             logger.info('Initalized Multiprocess To Get Returns...')
             with Pool(cpu_count()) as p:
                 res_pool = list(tqdm(p.imap(_get_return, tickers),
-                                total=len(tickers), ascii=ascii))
+                                     total=len(tickers), ascii=ascii))
             res = {item[0]: item[1] for item in res_pool}
 
         else:
             list(tqdm(map(_get_return, tickers), total=len(tickers),
-                 ascii=ascii))
+                      ascii=ascii))
 
         return res
 
