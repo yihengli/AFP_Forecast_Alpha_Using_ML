@@ -370,6 +370,7 @@ class Plotter:
 
     def get_sector_distributions(self,
                                  metric: str = 'RMSE',
+                                 sharex: bool = False,
                                  figsize: Tuple[float] = (10, 30)) -> mpl.figure.Figure:  # noqa 501
 
         def get_merged_df(name):
@@ -384,13 +385,13 @@ class Plotter:
         col = len(self.item_names)
         row = len(Sectors)
 
-        fig, ax = plt.subplots(row, col, figsize=figsize)
+        fig, ax = plt.subplots(row, col, figsize=figsize, sharex=sharex)
         axes = ax.flatten()
 
         for i, sector in enumerate(Sectors):
             for s in range(col):
                 df, name = datasets[s], self.item_names[s]
-                self.plot_histogram(axes[i*2+s],
+                self.plot_histogram(axes[i*col+s],
                                     df[df['Sector'] == sector][metric],
                                     self.colors[s], '<%s> %s' % (sector, name),
                                     metric)
@@ -426,7 +427,7 @@ class Plotter:
         for i, label in enumerate(labels):
             for c in range(col):
                 df, name = datasets[c], self.item_names[c]
-                self.plot_histogram(axes[i*2+c],
+                self.plot_histogram(axes[i*col+c],
                                     df[df['Cap'] == label][metric],
                                     self.colors[c], '<%s> %s' % (label, name),
                                     metric)
